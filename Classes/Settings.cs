@@ -77,19 +77,19 @@ namespace ellabi.Classes
 
         public bool AutoPause
         {
-            get { if (_autoPause == null) _autoPause = false; return _autoPause.Value; }
+            get { if (_autoPause == null) _autoPause = true; return _autoPause.Value; }
             set { _autoPause = value; OnPropertyChanged(); }
         }
 
         public bool AutoResume
         {
-            get { if (_autoResume == null) _autoResume = false; return _autoResume.Value; }
+            get { if (_autoResume == null) _autoResume = true; return _autoResume.Value; }
             set { _autoResume = value; OnPropertyChanged(); }
         }
 
         public int AutoResumeSeconds
         {
-            get { if (_autoResumeSeconds == null) _autoResumeSeconds = 30; return _autoResumeSeconds.Value; }
+            get { if (_autoResumeSeconds == null) _autoResumeSeconds = 60; return _autoResumeSeconds.Value; }
             set { _autoResumeSeconds = value; OnPropertyChanged(); }
         }
 

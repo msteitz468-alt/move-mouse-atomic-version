@@ -13,9 +13,7 @@ namespace ellabi.Views
             InitializeComponent();
         }
 
-        private void OnCancelClick(object? sender, RoutedEventArgs e) => Close();
-
-        private void OnSaveClick(object? sender, RoutedEventArgs e) => Close();
+        private void OnCloseClick(object? sender, RoutedEventArgs e) => Close();
 
         private void OnGitHubClick(object? sender, RoutedEventArgs e)
         {

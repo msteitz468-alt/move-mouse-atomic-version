@@ -110,6 +110,23 @@ namespace ellabi.ViewModels
 
             LoadSettings();
 
+            if (Settings.Actions == null || Settings.Actions.Length == 0)
+            {
+                Settings.Actions = new ActionBase[]
+                {
+                    new MoveMouseCursorAction
+                    {
+                        Name = "Default Move",
+                        Distance = 100,
+                        Direction = MoveMouseCursorAction.CursorDirection.Square,
+                        Speed = MoveMouseCursorAction.CursorSpeed.Normal,
+                        AbortIfUserActivityDetected = true,
+                        Repeat = true,
+                        IsEnabled = true
+                    }
+                };
+            }
+
             StaticCode.ScheduleArrived         += OnScheduleArrived;
             StaticCode.UpdateAvailablityChanged += v => UpdateAvailable = v;
             StaticCode.RefreshSchedules         += RefreshQuartzSchedules;

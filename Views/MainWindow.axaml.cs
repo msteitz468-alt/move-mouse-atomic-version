@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Input;
 using Avalonia.Interactivity;
 using ellabi.ViewModels;
 using System;
@@ -25,8 +26,15 @@ namespace ellabi.Views
             // Hide to tray instead of close
             Closing += (_, e) =>
             {
-                e.Cancel = true;
-                Hide();
+                if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime lt && lt.ShutdownMode == ShutdownMode.OnMainWindowClose)
+                {
+                    // Allow shutdown if it's initiated explicitly
+                }
+                else
+                {
+                    e.Cancel = true;
+                    Hide();
+                }
             };
         }
 
@@ -72,26 +80,37 @@ namespace ellabi.Views
             trayIcon.Menu = menu;
         }
 
-        private void OnCloseClick(object? sender, RoutedEventArgs e) => Hide();
+        public void OnPointerPressed(object? sender, PointerPressedEventArgs e)
+        {
+            var properties = e.GetCurrentPoint(this).Properties;
+            if (properties.IsLeftButtonPressed)
+            {
+                // Single left click to toggle Start/Stop state
+                if (e.ClickCount == 1)
+                {
+                    if (_vm != null)
+                    {
+                        if (_vm.IsRunning)
+                            _vm.Stop();
+                        else
+                            _vm.Start();
+                    }
+                }
+                BeginMoveDrag(e);
+            }
+        }
 
         private void OnSettingsClick(object? sender, RoutedEventArgs e)
         {
             var settingsWindow = new SettingsWindow { DataContext = _vm };
-            settingsWindow.ShowDialog(this);
+            settingsWindow.Show();
         }
 
-        private void OnViewUpdateClick(object? sender, RoutedEventArgs e)
+        private void OnCloseContextClick(object? sender, RoutedEventArgs e)
         {
-            try
-            {
-                var url = StaticCode.UpdateUrl;
-                if (!string.IsNullOrWhiteSpace(url))
-                    Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
-            }
-            catch (Exception ex)
-            {
-                StaticCode.Logger?.Here().Error(ex.Message);
-            }
+            _vm?.Stop();
+            if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime lt)
+                lt.Shutdown();
         }
 
         private void InitializeComponent() => Avalonia.Markup.Xaml.AvaloniaXamlLoader.Load(this);
