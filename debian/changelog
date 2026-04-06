@@ -1,0 +1,11 @@
+move-mouse (4.0.0-1) unstable; urgency=low
+
+  * Initial Linux port from Windows WPF/.NET Framework.
+  * Migrated to .NET 8 and Avalonia UI 11.
+  * Replaced Win32 API calls with xdotool for mouse/keyboard input.
+  * Replaced Windows.Storage paths with XDG-compliant directories.
+  * Replaced PowerShell script support with bash (.sh) scripts.
+  * Replaced Registry-based startup with ~/.config/autostart desktop entry.
+  * Added IInputProvider abstraction layer for future Wayland support.
+
+ -- Move Mouse <contact@movemouse.co.uk>  Sat, 05 Apr 2026 00:00:00 +0000

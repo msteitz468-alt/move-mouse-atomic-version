@@ -1,0 +1,32 @@
+#!/usr/bin/make -f
+# Debian rules file for move-mouse
+# Requires: dotnet-sdk-8.0
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	dotnet publish MoveMouseLinux.csproj \
+		--configuration Release \
+		--runtime linux-x64 \
+		--self-contained true \
+		--output debian/move-mouse/usr/lib/move-mouse \
+		-p:PublishSingleFile=true \
+		-p:DebugType=none
+
+override_dh_auto_install:
+	# Executable symlink
+	mkdir -p debian/move-mouse/usr/bin
+	ln -sf /usr/lib/move-mouse/move-mouse \
+		debian/move-mouse/usr/bin/move-mouse
+
+	# Desktop entry
+	mkdir -p debian/move-mouse/usr/share/applications
+	install -m 644 debian/move-mouse.desktop \
+		debian/move-mouse/usr/share/applications/move-mouse.desktop
+
+override_dh_auto_test:
+	# Tests not run during package build
+
+override_dh_strip:
+	# Do not strip .NET binaries

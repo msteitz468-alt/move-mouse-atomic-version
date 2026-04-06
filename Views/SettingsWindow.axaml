@@ -1,0 +1,115 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:ellabi.ViewModels"
+        xmlns:local="clr-namespace:ellabi"
+        x:Class="ellabi.Views.SettingsWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="Settings — Move Mouse"
+        Width="480" Height="560"
+        Background="#1E1E2E"
+        CanResize="True">
+
+    <Window.Styles>
+        <Style Selector="TextBlock.section">
+            <Setter Property="Foreground" Value="#89B4FA" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Margin" Value="0,8,0,4" />
+        </Style>
+        <Style Selector="CheckBox">
+            <Setter Property="Foreground" Value="#CDD6F4" />
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+    </Window.Styles>
+
+    <DockPanel>
+        <!-- Header -->
+        <Border DockPanel.Dock="Top" Background="#181825" Padding="16,10">
+            <TextBlock Text="Settings" Foreground="#CDD6F4"
+                       FontWeight="SemiBold" FontSize="14" />
+        </Border>
+
+        <!-- Save / Cancel -->
+        <Border DockPanel.Dock="Bottom" Background="#181825" Padding="12,8">
+            <Grid ColumnDefinitions="*,8,*">
+                <Button Grid.Column="0" Content="Cancel" Padding="0,8"
+                        Background="#313244" Foreground="#CDD6F4"
+                        HorizontalContentAlignment="Center"
+                        Click="OnCancelClick" />
+                <Button Grid.Column="2" Content="Save &amp; Close" Padding="0,8"
+                        Background="#89B4FA" Foreground="#1E1E2E"
+                        HorizontalContentAlignment="Center"
+                        Command="{Binding SaveSettingsCommand}"
+                        Click="OnSaveClick" />
+            </Grid>
+        </Border>
+
+        <!-- Settings content -->
+        <ScrollViewer Padding="16,8">
+            <StackPanel Spacing="2">
+
+                <!-- Behaviour -->
+                <TextBlock Classes="section" Text="Behaviour" />
+                <CheckBox Content="Start automatically at launch"
+                          IsChecked="{Binding Settings.StartAtLaunch}" />
+                <CheckBox Content="Launch Move Mouse at logon"
+                          IsChecked="{Binding Settings.LaunchAtLogon}" />
+                <CheckBox Content="Pause when user activity detected"
+                          IsChecked="{Binding Settings.AutoPause}" />
+
+                <Grid ColumnDefinitions="Auto,12,*" Margin="20,4,0,0"
+                      IsVisible="{Binding Settings.AutoPause}">
+                    <CheckBox Grid.Column="0" Content="Auto-resume after"
+                              IsChecked="{Binding Settings.AutoResume}" />
+                    <NumericUpDown Grid.Column="2" Value="{Binding Settings.AutoResumeSeconds}"
+                                   Minimum="1" Maximum="3600" FormatString="0" Width="80"
+                                   HorizontalAlignment="Left" />
+                </Grid>
+
+                <CheckBox Content="Minimise on stop"
+                          IsChecked="{Binding Settings.MinimiseOnStop}" />
+                <CheckBox Content="Pause when on battery"
+                          IsChecked="{Binding Settings.PauseOnBattery}" />
+
+                <!-- Window -->
+                <TextBlock Classes="section" Text="Window" />
+                <CheckBox Content="Keep window on top when running"
+                          IsChecked="{Binding Settings.TopmostWhenRunning}" />
+                <CheckBox Content="Hide from taskbar"
+                          IsChecked="{Binding Settings.HideFromTaskbar}" />
+                <CheckBox Content="Hide system tray icon"
+                          IsChecked="{Binding Settings.HideSystemTrayIcon}" />
+                <CheckBox Content="Show system tray notifications"
+                          IsChecked="{Binding Settings.ShowSystemTrayNotifications}" />
+
+                <!-- Logging -->
+                <TextBlock Classes="section" Text="Diagnostics" />
+                <CheckBox Content="Enable logging"
+                          IsChecked="{Binding Settings.EnableLogging}" />
+
+                <Grid ColumnDefinitions="Auto,12,*" Margin="20,4,0,0"
+                      IsVisible="{Binding Settings.EnableLogging}">
+                    <TextBlock Grid.Column="0" Text="Log path:"
+                               Foreground="#6C7086" FontSize="11"
+                               VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="2" Text="{x:Static local:StaticCode.LogPath}"
+                               Foreground="#CDD6F4" FontSize="11"
+                               TextWrapping="Wrap" />
+                </Grid>
+
+                <!-- About -->
+                <TextBlock Classes="section" Text="About" />
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Move Mouse for Linux"
+                               Foreground="#CDD6F4" FontSize="12" />
+                    <TextBlock Text="Powered by .NET 8 + Avalonia UI"
+                               Foreground="#6C7086" FontSize="11" />
+                    <Button Content="View on GitHub" Background="Transparent"
+                            Foreground="#89B4FA" FontSize="12" Padding="0,2"
+                            Click="OnGitHubClick" />
+                </StackPanel>
+
+            </StackPanel>
+        </ScrollViewer>
+    </DockPanel>
+</Window>

@@ -1,0 +1,8 @@
+[Bb]in/
+[Oo]bj/
+pkg/
+*.deb
+.vs/
+*.user
+*.suo
+build.log

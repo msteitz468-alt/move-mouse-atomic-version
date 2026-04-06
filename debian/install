@@ -1,0 +1,2 @@
+debian/move-mouse/usr/lib/move-mouse/* usr/lib/move-mouse/
+debian/move-mouse/usr/bin/move-mouse usr/bin/

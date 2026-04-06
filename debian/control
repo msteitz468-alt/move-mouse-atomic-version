@@ -1,0 +1,25 @@
+Source: move-mouse
+Section: utils
+Priority: optional
+Maintainer: Move Mouse <contact@movemouse.co.uk>
+Build-Depends: debhelper-compat (= 13), dotnet-sdk-8.0
+Standards-Version: 4.6.2
+Homepage: http://www.movemouse.co.uk
+Rules-Requires-Root: no
+
+Package: move-mouse
+Architecture: amd64
+Depends: ${shlibs:Depends}, ${misc:Depends},
+ libx11-6,
+ xdotool,
+ xprintidle,
+ wmctrl
+Recommends: libayatana-appindicator3-1
+Description: Automate mouse movement and keyboard actions on Linux
+ Move Mouse is a utility that periodically moves the mouse cursor and
+ simulates keyboard input to prevent screensavers, idle timeouts, and
+ keep-alive sessions. Supports scheduled start/stop via cron expressions,
+ custom actions (keystrokes, scrolling, scripts, application activation),
+ and blackout periods.
+ .
+ Built with .NET 8 and Avalonia UI. Uses xdotool for X11 input simulation.

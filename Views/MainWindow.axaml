@@ -1,0 +1,169 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:ellabi.ViewModels"
+        x:Class="ellabi.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="Move Mouse"
+        Width="340" Height="420"
+        MinWidth="300" MinHeight="380"
+        CanResize="True"
+        Background="#1E1E2E">
+
+    <Window.Resources>
+        <vm:StateToBrushConverter x:Key="StateToBrushConverter" />
+    </Window.Resources>
+
+    <Window.Styles>
+        <Style Selector="Button.action">
+            <Setter Property="Padding" Value="16,8" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.action:pointerover /template/ ContentPresenter">
+            <Setter Property="Opacity" Value="0.85" />
+        </Style>
+        <Style Selector="TextBlock.label">
+            <Setter Property="Foreground" Value="#CDD6F4" />
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+    </Window.Styles>
+
+    <DockPanel>
+        <!-- Title bar -->
+        <Border DockPanel.Dock="Top" Background="#181825" Padding="16,10">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+                <Ellipse Grid.Column="0" Width="10" Height="10"
+                         VerticalAlignment="Center" Margin="0,0,10,0">
+                    <Ellipse.Fill>
+                        <SolidColorBrush Color="{Binding State, Converter={StaticResource StateToBrushConverter}}" />
+                    </Ellipse.Fill>
+                </Ellipse>
+                <TextBlock Grid.Column="1" Text="Move Mouse"
+                           Foreground="#CDD6F4" FontWeight="SemiBold"
+                           VerticalAlignment="Center" />
+                <Button Grid.Column="2" Content="✕" Background="Transparent"
+                        Foreground="#6C7086" Padding="4,2"
+                        Click="OnCloseClick" />
+            </Grid>
+        </Border>
+
+        <!-- Status panel -->
+        <Border DockPanel.Dock="Top" Background="#24273A" Margin="12,10,12,0"
+                CornerRadius="8" Padding="16,12">
+            <StackPanel Spacing="4">
+                <TextBlock Text="{Binding StatusText}"
+                           Foreground="#CDD6F4" FontSize="18" FontWeight="Bold"
+                           HorizontalAlignment="Center" />
+                <TextBlock Text="{Binding IntervalDescription}"
+                           Foreground="#6C7086" FontSize="11"
+                           HorizontalAlignment="Center" />
+                <TextBlock Text="{Binding CountdownText}"
+                           Foreground="#A6E3A1" FontSize="13" FontWeight="SemiBold"
+                           HorizontalAlignment="Center"
+                           IsVisible="{Binding IsRunning}"
+                           Margin="0,4,0,0" />
+            </StackPanel>
+        </Border>
+
+        <!-- Control buttons -->
+        <Border DockPanel.Dock="Top" Padding="12,10">
+            <Grid ColumnDefinitions="*,8,*,8,*">
+                <!-- Start -->
+                <Button Grid.Column="0" Classes="action"
+                        Command="{Binding StartCommand}"
+                        Background="#A6E3A1" Foreground="#1E1E2E"
+                        ToolTip.Tip="Start automating">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <TextBlock Text="&#9654;" FontSize="10" VerticalAlignment="Center"/>
+                        <TextBlock Text="Start" />
+                    </StackPanel>
+                </Button>
+
+                <!-- Pause -->
+                <Button Grid.Column="2" Classes="action"
+                        Command="{Binding PauseCommand}"
+                        Background="#F9E2AF" Foreground="#1E1E2E"
+                        ToolTip.Tip="Pause">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <TextBlock Text="&#9646;&#9646;" FontSize="9" VerticalAlignment="Center"/>
+                        <TextBlock Text="Pause" />
+                    </StackPanel>
+                </Button>
+
+                <!-- Stop -->
+                <Button Grid.Column="4" Classes="action"
+                        Command="{Binding StopCommand}"
+                        Background="#F38BA8" Foreground="#1E1E2E"
+                        ToolTip.Tip="Stop">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <TextBlock Text="&#9632;" FontSize="10" VerticalAlignment="Center"/>
+                        <TextBlock Text="Stop" />
+                    </StackPanel>
+                </Button>
+            </Grid>
+        </Border>
+
+        <!-- Interval settings -->
+        <Border DockPanel.Dock="Top" Background="#24273A" Margin="12,0,12,8"
+                CornerRadius="8" Padding="14,12">
+            <Grid RowDefinitions="Auto,10,Auto,10,Auto">
+                <TextBlock Grid.Row="0" Text="Interval (seconds)"
+                           Foreground="#6C7086" FontSize="11" />
+                <Grid Grid.Row="2" ColumnDefinitions="*,8,*">
+                    <StackPanel Grid.Column="0" Spacing="3">
+                        <TextBlock Classes="label" Text="Lower" />
+                        <NumericUpDown Value="{Binding Settings.LowerInterval}"
+                                       Minimum="1" Maximum="3600"
+                                       FormatString="0" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Spacing="3">
+                        <TextBlock Classes="label" Text="Upper" />
+                        <NumericUpDown Value="{Binding Settings.UpperInterval}"
+                                       Minimum="1" Maximum="3600"
+                                       FormatString="0" />
+                    </StackPanel>
+                </Grid>
+                <StackPanel Grid.Row="4" Orientation="Horizontal" Spacing="8">
+                    <CheckBox Content="Random interval"
+                              IsChecked="{Binding Settings.RandomInterval}"
+                              Foreground="#CDD6F4" FontSize="12" />
+                    <CheckBox Content="Auto-pause on activity"
+                              IsChecked="{Binding Settings.AutoPause}"
+                              Foreground="#CDD6F4" FontSize="12" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Footer buttons -->
+        <Border DockPanel.Dock="Bottom" Padding="12,8">
+            <Grid ColumnDefinitions="*,8,*">
+                <Button Grid.Column="0" Classes="action"
+                        Content="Settings"
+                        Background="#313244" Foreground="#CDD6F4"
+                        Click="OnSettingsClick" />
+                <Button Grid.Column="2" Classes="action"
+                        Content="Save"
+                        Command="{Binding SaveSettingsCommand}"
+                        Background="#89B4FA" Foreground="#1E1E2E" />
+            </Grid>
+        </Border>
+
+        <!-- Update banner -->
+        <Border DockPanel.Dock="Bottom"
+                IsVisible="{Binding UpdateAvailable}"
+                Background="#F9E2AF" Padding="10,6" Margin="12,0">
+            <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Grid.Column="0" Text="Update available!"
+                           Foreground="#1E1E2E" FontSize="12" VerticalAlignment="Center" />
+                <Button Grid.Column="1" Content="View"
+                        Background="Transparent" Foreground="#1E1E2E"
+                        FontSize="12" Padding="6,2"
+                        Click="OnViewUpdateClick" />
+            </Grid>
+        </Border>
+
+    </DockPanel>
+
+
+</Window>
