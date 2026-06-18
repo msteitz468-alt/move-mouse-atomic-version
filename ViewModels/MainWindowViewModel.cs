@@ -1,3 +1,4 @@
+using Avalonia.Threading;
 using ellabi.Actions;
 using ellabi.Classes;
 using ellabi.Jobs;
@@ -329,14 +330,17 @@ namespace ellabi.ViewModels
 
                 var idle = StaticCode.GetLastInputTime();
 
+                // This runs on a System.Timers.Timer (background) thread. Pause()/Resume()
+                // mutate UI-bound state, which Avalonia only permits on the UI thread, so
+                // marshal the calls there to avoid a "Call from invalid thread" exception.
                 if (Settings.AutoPause && State == AppState.Running && idle.TotalSeconds < 2)
                 {
-                    Pause();
+                    Dispatcher.UIThread.Post(Pause);
                 }
                 else if (Settings.AutoResume && State == AppState.Paused &&
                          idle.TotalSeconds >= Settings.AutoResumeSeconds)
                 {
-                    Resume();
+                    Dispatcher.UIThread.Post(Resume);
                 }
             }
             catch (Exception ex)
