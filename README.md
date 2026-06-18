@@ -28,7 +28,7 @@ The backend is chosen from `XDG_SESSION_TYPE`. You can override it with the `MOV
 
 ### From Debian Package (Recommended)
 
-1. Check the [Releases](https://github.com/msteitz468-alt/move-mouse-linux/releases) page for the latest `.deb` package.
+1. Check the [Releases](https://github.com/msteitz468-alt/move-mouse-atomic-version/releases) page for the latest `.deb` package.
 2. Install it using `apt` (which will automatically resolve dependencies):
    ```bash
    sudo apt install ./move-mouse_4.0.0-1_amd64.deb
@@ -41,8 +41,8 @@ You'll need the **.NET 8 SDK**, `debhelper`, and `dpkg-dev` installed.
 Clone the repository and run the packaging script:
 
 ```bash
-git clone https://github.com/msteitz468-alt/move-mouse-linux.git
-cd move-mouse-linux
+git clone https://github.com/msteitz468-alt/move-mouse-atomic-version.git
+cd move-mouse-atomic-version
 ./build-deb.sh
 ```
 
