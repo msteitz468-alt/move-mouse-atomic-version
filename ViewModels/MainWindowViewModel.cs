@@ -6,6 +6,7 @@ using ellabi.Schedules;
 using Quartz;
 using Quartz.Impl;
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
@@ -43,6 +44,8 @@ namespace ellabi.ViewModels
         public Utilities.RelayCommand StopCommand { get; }
         public Utilities.RelayCommand PauseCommand { get; }
         public Utilities.RelayCommand SaveSettingsCommand { get; }
+        public Utilities.RelayCommand AddActionCommand { get; }
+        public Utilities.RelayCommand RemoveActionCommand { get; }
 
         // ── Bound properties ───────────────────────────────────────────────
         public AppState State
@@ -93,6 +96,31 @@ namespace ellabi.ViewModels
             set { _settings = value; OnPropertyChanged(); }
         }
 
+        // ── Actions editor ─────────────────────────────────────────────────
+        private ActionBase? _selectedAction;
+        private string _selectedActionTypeName = "Move Cursor";
+
+        /// <summary>Observable view of Settings.Actions so add/remove updates the UI.</summary>
+        public ObservableCollection<ActionBase> Actions { get; } = new();
+
+        public ActionBase? SelectedAction
+        {
+            get => _selectedAction;
+            set { _selectedAction = value; OnPropertyChanged(); RaiseCommandsChanged(); }
+        }
+
+        public IReadOnlyList<string> ActionTypeNames { get; } = new[]
+        {
+            "Move Cursor", "Click", "Scroll", "Position Cursor", "Keystroke",
+            "Activate Application", "Run Command", "Script", "Sleep"
+        };
+
+        public string SelectedActionTypeName
+        {
+            get => _selectedActionTypeName;
+            set { _selectedActionTypeName = value; OnPropertyChanged(); }
+        }
+
         public int CountdownSeconds
         {
             get => _countdownSeconds;
@@ -108,6 +136,8 @@ namespace ellabi.ViewModels
             StopCommand        = new Utilities.RelayCommand(_ => Stop(),   _ => !IsStopped);
             PauseCommand       = new Utilities.RelayCommand(_ => Pause(),  _ => IsRunning);
             SaveSettingsCommand = new Utilities.RelayCommand(_ => SaveSettings());
+            AddActionCommand    = new Utilities.RelayCommand(_ => AddAction());
+            RemoveActionCommand = new Utilities.RelayCommand(_ => RemoveAction(), _ => SelectedAction != null);
 
             LoadSettings();
 
@@ -128,6 +158,8 @@ namespace ellabi.ViewModels
                 };
             }
 
+            RebuildActionsCollection();
+
             StaticCode.ScheduleArrived         += OnScheduleArrived;
             StaticCode.UpdateAvailablityChanged += v => UpdateAvailable = v;
             StaticCode.RefreshSchedules         += RefreshQuartzSchedules;
@@ -137,6 +169,51 @@ namespace ellabi.ViewModels
             if (Settings.StartAtLaunch)
                 Start();
         }
+
+        // ── Actions add / remove ───────────────────────────────────────────
+        private void RebuildActionsCollection()
+        {
+            Actions.Clear();
+            if (Settings.Actions != null)
+                foreach (var a in Settings.Actions)
+                    Actions.Add(a);
+            SelectedAction = Actions.FirstOrDefault();
+        }
+
+        private void AddAction()
+        {
+            var action = CreateAction(SelectedActionTypeName);
+            action.Id = Guid.NewGuid();
+            Actions.Add(action);
+            SyncActionsToSettings();
+            SelectedAction = action;
+        }
+
+        private void RemoveAction()
+        {
+            if (SelectedAction == null) return;
+            var idx = Actions.IndexOf(SelectedAction);
+            Actions.Remove(SelectedAction);
+            SyncActionsToSettings();
+            SelectedAction = Actions.Count == 0 ? null : Actions[Math.Min(idx, Actions.Count - 1)];
+        }
+
+        /// <summary>Mirror the observable collection back into the serialized array
+        /// the engine reads from.</summary>
+        private void SyncActionsToSettings() => Settings.Actions = Actions.ToArray();
+
+        private static ActionBase CreateAction(string typeName) => typeName switch
+        {
+            "Click"                => new ClickMouseAction          { Name = "Click",           IsEnabled = true, Repeat = true },
+            "Scroll"               => new ScrollMouseAction         { Name = "Scroll",          IsEnabled = true, Repeat = true },
+            "Position Cursor"      => new PositionMouseCursorAction { Name = "Position Cursor", IsEnabled = true, Repeat = true },
+            "Keystroke"            => new KeystrokeAction           { Name = "Keystroke",       IsEnabled = true, Repeat = true },
+            "Activate Application" => new ActivateApplicationAction { Name = "Activate App",    IsEnabled = true, Repeat = true },
+            "Run Command"          => new CommandAction             { Name = "Run Command",     IsEnabled = true, Repeat = true },
+            "Script"               => new ScriptAction              { Name = "Script",          IsEnabled = true, Repeat = true },
+            "Sleep"                => new SleepAction                { Name = "Sleep",           IsEnabled = true, Repeat = true },
+            _                      => new MoveMouseCursorAction     { Name = "Move Cursor", Distance = 100, IsEnabled = true, Repeat = true },
+        };
 
         // ── Start / Stop / Pause ───────────────────────────────────────────
         public void Start()
@@ -449,6 +526,7 @@ namespace ellabi.ViewModels
         {
             try
             {
+                SyncActionsToSettings();
                 Directory.CreateDirectory(StaticCode.WorkingDirectory);
                 var path = StaticCode.SettingsXmlPath;
                 var serializer = new XmlSerializer(typeof(Settings));

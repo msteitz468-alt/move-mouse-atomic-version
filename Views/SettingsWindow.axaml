@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:ellabi.ViewModels"
+        xmlns:actions="clr-namespace:ellabi.Actions"
         xmlns:local="clr-namespace:ellabi"
         x:Class="ellabi.Views.SettingsWindow"
         x:DataType="vm:MainWindowViewModel"
@@ -54,66 +55,167 @@
         <TabControl Grid.Row="0" TabStripPlacement="Right" Margin="0,10,10,0">
             <TabItem Header="Actions">
                 <Border Classes="TabContent">
-                    <Grid ColumnDefinitions="200,*" DataContext="{Binding Settings}">
-                        <!-- Left Panel -->
-                        <Border Grid.Column="0" BorderBrush="#333" BorderThickness="0,0,1,0" Margin="0,0,15,0" Padding="0,0,15,0">
-                            <ListBox x:Name="ActionsList" ItemsSource="{Binding Actions}" SelectedIndex="0" Background="Transparent" Foreground="White">
-                                <ListBox.ItemTemplate>
-                                    <DataTemplate>
-                                        <TextBlock Text="{Binding Name}" Foreground="White" Padding="5"/>
-                                    </DataTemplate>
-                                </ListBox.ItemTemplate>
-                            </ListBox>
-                        </Border>
-                        
-                        <!-- Right Panel -->
-                        <StackPanel Grid.Column="1" DataContext="{Binding #ActionsList.SelectedItem}" x:CompileBindings="False">
-                            <Grid ColumnDefinitions="100,*" Margin="0,0,0,10">
-                                <TextBlock Text="Name" Foreground="White" VerticalAlignment="Center"/>
-                                <TextBox Grid.Column="1" Text="{Binding Name}" Background="#222" Foreground="White"/>
-                            </Grid>
-                            
-                            <Grid ColumnDefinitions="100,*" Margin="0,0,0,10">
-                                <TextBlock Text="Random" Foreground="White" VerticalAlignment="Center"/>
-                                <ToggleSwitch Grid.Column="1" IsChecked="{Binding Random}"/>
-                            </Grid>
-                            
-                            <Grid ColumnDefinitions="100,*" Margin="0,0,0,10">
-                                <TextBlock Text="Distance" Foreground="White" VerticalAlignment="Center"/>
-                                <NumericUpDown Grid.Column="1" Value="{Binding Distance}" Minimum="1" Maximum="2000" FormatString="0" HorizontalAlignment="Left" Width="100"/>
-                            </Grid>
+                    <Grid ColumnDefinitions="220,*" x:CompileBindings="False">
+                        <Grid.Styles>
+                            <Style Selector="TextBlock.FieldLabel">
+                                <Setter Property="Foreground" Value="White"/>
+                                <Setter Property="VerticalAlignment" Value="Center"/>
+                            </Style>
+                            <Style Selector="ComboBox.Field">
+                                <Setter Property="HorizontalAlignment" Value="Left"/>
+                                <Setter Property="Width" Value="180"/>
+                                <Setter Property="Background" Value="#222"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Style>
+                            <Style Selector="TextBox.Field">
+                                <Setter Property="Background" Value="#222"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Style>
+                            <Style Selector="Grid.Row">
+                                <Setter Property="Margin" Value="0,0,0,8"/>
+                            </Style>
+                        </Grid.Styles>
 
-                            <Grid ColumnDefinitions="100,*" Margin="0,0,0,10">
-                                <TextBlock Text="Direction" Foreground="White" VerticalAlignment="Center"/>
-                                <ComboBox Grid.Column="1" ItemsSource="{Binding CursorDirectionValues}" SelectedItem="{Binding Direction}" HorizontalAlignment="Left" Width="150" Background="#222" Foreground="White"/>
-                            </Grid>
+                        <!-- Left: action list + add/remove -->
+                        <Grid Grid.Column="0" RowDefinitions="*,Auto" Margin="0,0,15,0">
+                            <Border Grid.Row="0" BorderBrush="#333" BorderThickness="0,0,1,0" Padding="0,0,15,0">
+                                <ListBox x:Name="ActionsList" ItemsSource="{Binding Actions}"
+                                         SelectedItem="{Binding SelectedAction}"
+                                         Background="Transparent" Foreground="White">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding Name}" Foreground="White" Padding="5"/>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </Border>
+                            <StackPanel Grid.Row="1" Margin="0,8,15,0" Spacing="6">
+                                <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding ActionTypeNames}"
+                                          SelectedItem="{Binding SelectedActionTypeName}"
+                                          Background="#222" Foreground="White"/>
+                                <Grid ColumnDefinitions="*,*">
+                                    <Button Grid.Column="0" Content="Add" Command="{Binding AddActionCommand}"
+                                            Margin="0,0,4,0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                                            Background="#4582c4" Foreground="White"/>
+                                    <Button Grid.Column="1" Content="Remove" Command="{Binding RemoveActionCommand}"
+                                            Margin="4,0,0,0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                                            Background="#5a3030" Foreground="White"/>
+                                </Grid>
+                            </StackPanel>
+                        </Grid>
 
-                            <Grid ColumnDefinitions="100,*" Margin="0,0,0,10">
-                                <TextBlock Text="Abortable" Foreground="White" VerticalAlignment="Center"/>
-                                <ToggleSwitch Grid.Column="1" IsChecked="{Binding AbortIfUserActivityDetected}"/>
-                            </Grid>
+                        <!-- Right: editor for the selected action -->
+                        <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
+                            <StackPanel DataContext="{Binding SelectedAction}">
+                                <TextBlock Text="Select or add an action to edit it." Foreground="#888"
+                                           IsVisible="{Binding $parent[ScrollViewer].DataContext, Converter={x:Static ObjectConverters.IsNull}}"/>
 
-                            <Grid ColumnDefinitions="100,*" Margin="0,0,0,10">
-                                <TextBlock Text="Speed" Foreground="White" VerticalAlignment="Center"/>
-                                <ComboBox Grid.Column="1" ItemsSource="{Binding CursorSpeedValues}" SelectedItem="{Binding Speed}" HorizontalAlignment="Left" Width="150" Background="#222" Foreground="White"/>
-                            </Grid>
-                            
-                            <Grid ColumnDefinitions="100,*" Margin="0,0,0,10">
-                                <TextBlock Text="Trigger" Foreground="White" VerticalAlignment="Center"/>
-                                <ComboBox Grid.Column="1" ItemsSource="{Binding EventTriggerValues}" SelectedItem="{Binding Trigger}" HorizontalAlignment="Left" Width="150" Background="#222" Foreground="White"/>
-                            </Grid>
-                            
-                            <Grid ColumnDefinitions="100,Auto,Auto" Margin="0,0,0,10">
-                                <TextBlock Text="Repeat" Foreground="White" VerticalAlignment="Center"/>
-                                <ToggleSwitch Grid.Column="1" IsChecked="{Binding Repeat}" Margin="0,0,10,0"/>
-                                <ComboBox Grid.Column="2" ItemsSource="{Binding IntervalRepeatModeValues}" SelectedItem="{Binding RepeatMode}" HorizontalAlignment="Left" Width="120" Background="#222" Foreground="White"/>
-                            </Grid>
-                            
-                            <Grid ColumnDefinitions="100,*" Margin="0,0,0,10">
-                                <TextBlock Text="Enabled" Foreground="White" VerticalAlignment="Center"/>
-                                <ToggleSwitch Grid.Column="1" IsChecked="{Binding IsEnabled}"/>
-                            </Grid>
-                        </StackPanel>
+                                <!-- Common fields -->
+                                <Grid Classes="Row" ColumnDefinitions="120,*">
+                                    <TextBlock Classes="FieldLabel" Text="Name"/>
+                                    <TextBox Grid.Column="1" Classes="Field" Text="{Binding Name}"/>
+                                </Grid>
+                                <Grid Classes="Row" ColumnDefinitions="120,*">
+                                    <TextBlock Classes="FieldLabel" Text="Trigger"/>
+                                    <ComboBox Grid.Column="1" Classes="Field" ItemsSource="{Binding EventTriggerValues}" SelectedItem="{Binding Trigger}"/>
+                                </Grid>
+                                <Grid Classes="Row" ColumnDefinitions="120,Auto,Auto">
+                                    <TextBlock Classes="FieldLabel" Text="Repeat"/>
+                                    <ToggleSwitch Grid.Column="1" IsChecked="{Binding Repeat}" Margin="0,0,10,0"/>
+                                    <ComboBox Grid.Column="2" Classes="Field" Width="130" ItemsSource="{Binding IntervalRepeatModeValues}" SelectedItem="{Binding RepeatMode}"/>
+                                </Grid>
+                                <Grid Classes="Row" ColumnDefinitions="120,*">
+                                    <TextBlock Classes="FieldLabel" Text="Enabled"/>
+                                    <ToggleSwitch Grid.Column="1" IsChecked="{Binding IsEnabled}"/>
+                                </Grid>
+
+                                <Separator Background="#333" Margin="0,4,0,10"/>
+
+                                <!-- Type-specific fields -->
+                                <ContentControl Content="{Binding}">
+                                    <ContentControl.DataTemplates>
+
+                                        <DataTemplate DataType="actions:MoveMouseCursorAction">
+                                            <StackPanel>
+                                                <Grid Classes="Row" ColumnDefinitions="120,*"><TextBlock Classes="FieldLabel" Text="Distance"/><NumericUpDown Grid.Column="1" Value="{Binding Distance}" Minimum="1" Maximum="2000" FormatString="0" HorizontalAlignment="Left" Width="120"/></Grid>
+                                                <Grid Classes="Row" ColumnDefinitions="120,*"><TextBlock Classes="FieldLabel" Text="Direction"/><ComboBox Grid.Column="1" Classes="Field" ItemsSource="{Binding CursorDirectionValues}" SelectedItem="{Binding Direction}"/></Grid>
+                                                <Grid Classes="Row" ColumnDefinitions="120,*"><TextBlock Classes="FieldLabel" Text="Speed"/><ComboBox Grid.Column="1" Classes="Field" ItemsSource="{Binding CursorSpeedValues}" SelectedItem="{Binding Speed}"/></Grid>
+                                                <Grid Classes="Row" ColumnDefinitions="120,*"><TextBlock Classes="FieldLabel" Text="Random"/><ToggleSwitch Grid.Column="1" IsChecked="{Binding Random}"/></Grid>
+                                                <Grid Classes="Row" ColumnDefinitions="120,*"><TextBlock Classes="FieldLabel" Text="Max distance"/><NumericUpDown Grid.Column="1" Value="{Binding UpperDistance}" Minimum="1" Maximum="2000" FormatString="0" HorizontalAlignment="Left" Width="120"/></Grid>
+                                                <Grid Classes="Row" ColumnDefinitions="120,*"><TextBlock Classes="FieldLabel" Text="Stop on activity"/><ToggleSwitch Grid.Column="1" IsChecked="{Binding AbortIfUserActivityDetected}"/></Grid>
+                                            </StackPanel>
+                                        </DataTemplate>
+
+                                        <DataTemplate DataType="actions:ClickMouseAction">
+                                            <StackPanel>
+                                                <Grid Classes="Row" ColumnDefinitions="120,*"><TextBlock Classes="FieldLabel" Text="Button"/><ComboBox Grid.Column="1" Classes="Field" ItemsSource="{Binding MouseButtonValues}" SelectedItem="{Binding Button}"/></Grid>
+                                                <Grid Classes="Row" ColumnDefinitions="120,*"><TextBlock Classes="FieldLabel" Text="Hold"/><ToggleSwitch Grid.Column="1" IsChecked="{Binding Hold}"/></Grid>
+                                                <Grid Classes="Row" ColumnDefinitions="120,*"><TextBlock Classes="FieldLabel" Text="Hold seconds"/><NumericUpDown Grid.Column="1" Value="{Binding HoldInterval}" Minimum="0" Maximum="60" Increment="0.1" FormatString="0.0" HorizontalAlignment="Left" Width="120"/></Grid>
+                                            </StackPanel>
+                                        </DataTemplate>
+
+                                        <DataTemplate DataType="actions:ScrollMouseAction">
+                                            <StackPanel>
+                                                <Grid Classes="Row" ColumnDefinitions="120,*"><TextBlock Classes="FieldLabel" Text="Direction"/><ComboBox Grid.Column="1" Classes="Field" ItemsSource="{Binding WheelDirectionValues}" SelectedItem="{Binding Direction}"/></Grid>
+                                                <Grid Classes="Row" ColumnDefinitions="120,*"><TextBlock Classes="FieldLabel" Text="Amount"/><NumericUpDown Grid.Column="1" Value="{Binding Distance}" Minimum="1" Maximum="10000" FormatString="0" HorizontalAlignment="Left" Width="120"/></Grid>
+                                                <Grid Classes="Row" ColumnDefinitions="120,*"><TextBlock Classes="FieldLabel" Text="Random"/><ToggleSwitch Grid.Column="1" IsChecked="{Binding Random}"/></Grid>
+                                                <Grid Classes="Row" ColumnDefinitions="120,*"><TextBlock Classes="FieldLabel" Text="Max amount"/><NumericUpDown Grid.Column="1" Value="{Binding UpperDistance}" Minimum="1" Maximum="10000" FormatString="0" HorizontalAlignment="Left" Width="120"/></Grid>
+                                                <TextBlock Text="Note: scroll is not supported on the Wayland backend." Foreground="#c98" FontSize="11" TextWrapping="Wrap"/>
+                                            </StackPanel>
+                                        </DataTemplate>
+
+                                        <DataTemplate DataType="actions:PositionMouseCursorAction">
+                                            <StackPanel>
+                                                <Grid Classes="Row" ColumnDefinitions="120,*"><TextBlock Classes="FieldLabel" Text="X"/><NumericUpDown Grid.Column="1" Value="{Binding X}" Minimum="0" Maximum="20000" FormatString="0" HorizontalAlignment="Left" Width="120"/></Grid>
+                                                <Grid Classes="Row" ColumnDefinitions="120,*"><TextBlock Classes="FieldLabel" Text="Y"/><NumericUpDown Grid.Column="1" Value="{Binding Y}" Minimum="0" Maximum="20000" FormatString="0" HorizontalAlignment="Left" Width="120"/></Grid>
+                                            </StackPanel>
+                                        </DataTemplate>
+
+                                        <DataTemplate DataType="actions:KeystrokeAction">
+                                            <StackPanel>
+                                                <Grid Classes="Row" ColumnDefinitions="120,*"><TextBlock Classes="FieldLabel" Text="Method"/><ComboBox Grid.Column="1" Classes="Field" ItemsSource="{Binding InputMethodValues}" SelectedItem="{Binding Method}"/></Grid>
+                                                <Grid Classes="Row" ColumnDefinitions="120,*"><TextBlock Classes="FieldLabel" Text="Keys (VK)"/><TextBox Grid.Column="1" Classes="Field" Text="{Binding KeystrokesText}" Watermark="e.g. 17,65"/></Grid>
+                                                <TextBlock Text="Comma-separated Windows virtual-key codes (17=Ctrl, 16=Shift, 65=A ...)." Foreground="#888" FontSize="11" TextWrapping="Wrap"/>
+                                            </StackPanel>
+                                        </DataTemplate>
+
+                                        <DataTemplate DataType="actions:ActivateApplicationAction">
+                                            <StackPanel>
+                                                <Grid Classes="Row" ColumnDefinitions="120,*"><TextBlock Classes="FieldLabel" Text="Match by"/><ComboBox Grid.Column="1" Classes="Field" ItemsSource="{Binding SearchModeValues}" SelectedItem="{Binding Mode}"/></Grid>
+                                                <Grid Classes="Row" ColumnDefinitions="120,*"><TextBlock Classes="FieldLabel" Text="Application"/><TextBox Grid.Column="1" Classes="Field" Text="{Binding Application}"/></Grid>
+                                                <TextBlock Text="Note: window activation is limited on the Wayland backend." Foreground="#c98" FontSize="11" TextWrapping="Wrap"/>
+                                            </StackPanel>
+                                        </DataTemplate>
+
+                                        <DataTemplate DataType="actions:CommandAction">
+                                            <StackPanel>
+                                                <Grid Classes="Row" ColumnDefinitions="120,*"><TextBlock Classes="FieldLabel" Text="File path"/><TextBox Grid.Column="1" Classes="Field" Text="{Binding FilePath}"/></Grid>
+                                                <Grid Classes="Row" ColumnDefinitions="120,*"><TextBlock Classes="FieldLabel" Text="Arguments"/><TextBox Grid.Column="1" Classes="Field" Text="{Binding Arguments}"/></Grid>
+                                                <Grid Classes="Row" ColumnDefinitions="120,*"><TextBlock Classes="FieldLabel" Text="Wait for exit"/><ToggleSwitch Grid.Column="1" IsChecked="{Binding WaitForExit}"/></Grid>
+                                                <Grid Classes="Row" ColumnDefinitions="120,*"><TextBlock Classes="FieldLabel" Text="Hidden"/><ToggleSwitch Grid.Column="1" IsChecked="{Binding Hidden}"/></Grid>
+                                            </StackPanel>
+                                        </DataTemplate>
+
+                                        <DataTemplate DataType="actions:ScriptAction">
+                                            <StackPanel>
+                                                <Grid Classes="Row" ColumnDefinitions="120,*"><TextBlock Classes="FieldLabel" Text="Script path"/><TextBox Grid.Column="1" Classes="Field" Text="{Binding ScriptPath}"/></Grid>
+                                                <Grid Classes="Row" ColumnDefinitions="120,*"><TextBlock Classes="FieldLabel" Text="Wait for exit"/><ToggleSwitch Grid.Column="1" IsChecked="{Binding WaitForExit}"/></Grid>
+                                                <Grid Classes="Row" ColumnDefinitions="120,*"><TextBlock Classes="FieldLabel" Text="Hidden"/><ToggleSwitch Grid.Column="1" IsChecked="{Binding Hidden}"/></Grid>
+                                            </StackPanel>
+                                        </DataTemplate>
+
+                                        <DataTemplate DataType="actions:SleepAction">
+                                            <StackPanel>
+                                                <Grid Classes="Row" ColumnDefinitions="120,*"><TextBlock Classes="FieldLabel" Text="Seconds"/><NumericUpDown Grid.Column="1" Value="{Binding Seconds}" Minimum="0" Maximum="86400" Increment="0.5" FormatString="0.0" HorizontalAlignment="Left" Width="120"/></Grid>
+                                                <Grid Classes="Row" ColumnDefinitions="120,*"><TextBlock Classes="FieldLabel" Text="Random"/><ToggleSwitch Grid.Column="1" IsChecked="{Binding Random}"/></Grid>
+                                                <Grid Classes="Row" ColumnDefinitions="120,*"><TextBlock Classes="FieldLabel" Text="Max seconds"/><NumericUpDown Grid.Column="1" Value="{Binding UpperSeconds}" Minimum="0" Maximum="86400" Increment="0.5" FormatString="0.0" HorizontalAlignment="Left" Width="120"/></Grid>
+                                            </StackPanel>
+                                        </DataTemplate>
+
+                                    </ContentControl.DataTemplates>
+                                </ContentControl>
+                            </StackPanel>
+                        </ScrollViewer>
                     </Grid>
                 </Border>
             </TabItem>

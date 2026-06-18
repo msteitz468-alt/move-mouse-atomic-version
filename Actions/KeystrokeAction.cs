@@ -23,7 +23,25 @@ namespace ellabi.Actions
         public int[]? Keystrokes
         {
             get => _keystrokes;
-            set { _keystrokes = value; OnPropertyChanged(nameof(Keystrokes)); }
+            set { _keystrokes = value; OnPropertyChanged(nameof(Keystrokes)); OnPropertyChanged(nameof(KeystrokesText)); }
+        }
+
+        /// <summary>
+        /// Editor-friendly view of <see cref="Keystrokes"/> as comma-separated Windows
+        /// virtual-key codes (e.g. "17,65" = Ctrl+A). Not serialized.
+        /// </summary>
+        [XmlIgnore]
+        public string KeystrokesText
+        {
+            get => _keystrokes == null ? string.Empty : string.Join(",", _keystrokes);
+            set
+            {
+                Keystrokes = (value ?? string.Empty)
+                    .Split(new[] { ',', ' ' }, StringSplitOptions.RemoveEmptyEntries)
+                    .Select(s => int.TryParse(s.Trim(), out var v) ? v : -1)
+                    .Where(v => v > 0)
+                    .ToArray();
+            }
         }
 
         public InputMethod Method
