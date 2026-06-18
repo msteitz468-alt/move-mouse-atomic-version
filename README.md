@@ -138,11 +138,17 @@ Run `move-mouse`, or pick **Move Mouse** from your application launcher. On star
 
 **Troubleshooting:** if the cursor doesn't move, check that log. A `failed to connect socket .../.ydotool_socket` line means `ydotoold` isn't running — verify step 3 and that you rebooted after step 2.
 
+## Auto-Pause on Wayland
+
+**Auto-Pause**, **Auto-Resume**, and per-action **break-on-user-activity** work on Wayland even though the compositor exposes no idle-time API. The Wayland backend reads raw input events directly from `/dev/input/event*` to tell when you last used the keyboard or mouse, ignoring the cursor movement the app generates itself (ydotool's own virtual device is excluded).
+
+This requires the app to be able to read those devices, which the [setup above](#fedora-atomic-silverblue--kinoite--wayland) provides by adding you to the `input` group. If the app can't read them, it logs `available=False` and these features stay disabled rather than misbehaving. Auto-Pause is enabled by default; configure it under **Settings → Auto-Pause**.
+
 ## Known Issues
 
-- **Wayland feature limits**: On Wayland the compositor forbids clients from reading the pointer position or querying idle time. The `ydotool` backend therefore cannot support:
-  - **Auto-Pause / Auto-Resume** and **break-on-user-activity** (no idle/position query) — these are automatically disabled.
-  - **Scroll-wheel actions** and **activate-window-by-title** (not exposed by `ydotool`) — these are no-ops, logged as warnings.
+- **Wayland feature limits**: A couple of features still can't be supported on the `ydotool` backend, because the underlying tooling doesn't expose them:
+  - **Scroll-wheel actions** — `ydotool` has no wheel command.
+  - **Activate-window-by-title** — not exposed to clients on Wayland.
 
-  Mouse movement, clicks, and keystrokes — the core keep-alive features — work normally. If you need the auto-pause behaviour, run an **X11 session** instead, where the `xdotool` backend provides the full feature set.
+  Both are no-ops, logged as warnings. Mouse movement, clicks, keystrokes, schedules, and auto-pause all work normally. For the full feature set including these two, run an **X11 session**, where the `xdotool` backend is used.
 - **`/dev/uinput` permissions**: The Wayland backend requires access to `/dev/uinput` and a running `ydotoold` daemon (see setup above). Without them, input simulation silently fails — check the log.

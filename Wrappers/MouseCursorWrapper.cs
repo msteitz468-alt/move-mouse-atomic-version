@@ -20,11 +20,10 @@ namespace ellabi.Wrappers
         {
             try
             {
-                // Break-on-user-activity works by noticing the pointer moved to a spot we
-                // didn't put it. That requires reading the real cursor, which Wayland
-                // forbids; on such backends we skip the check and keep moving.
-                if (BreakOnUserActivity && (StaticCode.InputProvider?.SupportsPositionQuery ?? false)
-                    && _previousLocations.Count > 0 && !_previousLocations.Contains(GetCursorPosition()))
+                // Break-on-user-activity: stop as soon as the user is at the controls.
+                // On X11 we detect this by the pointer being somewhere we didn't put it;
+                // on Wayland (no pointer read) we use recent real input from evdev.
+                if (BreakOnUserActivity && IsUserActive())
                 {
                     UserActivityDetected = true;
                     return;
@@ -69,6 +68,28 @@ namespace ellabi.Wrappers
                 StaticCode.Logger?.Here().Error(ex.Message);
                 return Point.Empty;
             }
+        }
+
+        // Input within this window counts as the user being actively at the machine.
+        private static readonly TimeSpan UserActiveWindow = TimeSpan.FromMilliseconds(750);
+
+        /// <summary>
+        /// True if the user appears to be operating the machine themselves. Uses the
+        /// pointer position on X11; on Wayland uses recent real input (evdev idle time),
+        /// which excludes the cursor movement this app generates.
+        /// </summary>
+        private bool IsUserActive()
+        {
+            var provider = StaticCode.InputProvider;
+            if (provider == null) return false;
+
+            if (provider.SupportsPositionQuery)
+                return _previousLocations.Count > 0 && !_previousLocations.Contains(GetCursorPosition());
+
+            if (provider.SupportsIdleQuery)
+                return provider.GetIdleTime() < UserActiveWindow;
+
+            return false; // no way to tell — keep moving
         }
     }
 }

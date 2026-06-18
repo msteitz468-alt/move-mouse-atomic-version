@@ -92,15 +92,21 @@ namespace ellabi.Actions
 
                 if (Method == InputMethod.Sequential)
                 {
-                    // Abort-on-activity compares cursor positions, which only works where
-                    // the pointer can be read (X11); skip the check on Wayland backends.
-                    var canDetectActivity = StaticCode.InputProvider?.SupportsPositionQuery ?? false;
+                    // Abort-on-activity uses the pointer position on X11; on Wayland it
+                    // uses recent real input (evdev idle time). Capture the baseline so a
+                    // position change OR fresh input mid-sequence triggers an abort.
+                    var provider = StaticCode.InputProvider;
+                    var canDetectByPosition = provider?.SupportsPositionQuery ?? false;
+                    var canDetectByIdle = (provider?.SupportsIdleQuery ?? false) && !canDetectByPosition;
                     var initialPos = new MouseCursorWrapper().GetCursorPosition();
 
                     foreach (var vk in _keystrokes)
                     {
-                        if (AbortIfUserActivityDetected && canDetectActivity
-                            && initialPos != new MouseCursorWrapper().GetCursorPosition())
+                        var userActive =
+                            (canDetectByPosition && initialPos != new MouseCursorWrapper().GetCursorPosition()) ||
+                            (canDetectByIdle && (provider!.GetIdleTime() < TimeSpan.FromMilliseconds(750)));
+
+                        if (AbortIfUserActivityDetected && userActive)
                         {
                             Aborted = true;
                             break;

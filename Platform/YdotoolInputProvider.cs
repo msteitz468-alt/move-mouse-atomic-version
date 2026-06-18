@@ -25,8 +25,15 @@ namespace ellabi.Platform
     /// </summary>
     public class YdotoolInputProvider : IInputProvider
     {
+        // The real pointer still cannot be read on Wayland, but user activity (and hence
+        // idle time) is recovered by reading evdev input devices directly.
         public bool SupportsPositionQuery => false;
-        public bool SupportsIdleQuery => false;
+        public bool SupportsIdleQuery => _activityMonitor.IsAvailable;
+
+        // Reads /dev/input/event* to tell when the user last touched a key or the mouse,
+        // excluding ydotool's own injection device. Requires membership of the 'input'
+        // group; if it can't open any device, SupportsIdleQuery stays false.
+        private readonly EvdevActivityMonitor _activityMonitor = new();
 
         // A virtual cursor: we cannot read the real pointer on Wayland, so we track
         // where we have moved it to. This keeps GetPosition() self-consistent for any
@@ -171,10 +178,9 @@ namespace ellabi.Platform
 
         public TimeSpan GetIdleTime()
         {
-            // No idle point-query exists on KDE Wayland (KWin returns "not supported"
-            // and logind's IdleHint is unreliable). SupportsIdleQuery is false; return
-            // zero so the property has a defined value even though callers skip it.
-            return TimeSpan.Zero;
+            // KDE Wayland exposes no idle point-query, so we derive it from raw evdev
+            // input instead. Falls back to zero if no input devices could be opened.
+            return _activityMonitor.IsAvailable ? _activityMonitor.GetIdleTime() : TimeSpan.Zero;
         }
 
         public void ActivateWindow(string windowTitle)

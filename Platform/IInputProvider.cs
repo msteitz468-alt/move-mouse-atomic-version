@@ -16,9 +16,9 @@ namespace ellabi.Platform
         bool SupportsPositionQuery { get; }
 
         /// <summary>
-        /// True if GetIdleTime() returns a real value. False on backends (e.g. KDE
-        /// Wayland) with no idle point-query, in which case auto-pause/auto-resume
-        /// must be skipped rather than act on a meaningless zero.
+        /// True if GetIdleTime() returns a real value. The Wayland backend reports this
+        /// only when it can read evdev input devices (process is in the 'input' group);
+        /// when false, auto-pause/auto-resume must be skipped rather than act on a zero.
         /// </summary>
         bool SupportsIdleQuery { get; }
 
