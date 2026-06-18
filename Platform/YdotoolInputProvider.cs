@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
+using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 
 namespace ellabi.Platform
 {
@@ -34,6 +36,10 @@ namespace ellabi.Platform
         // excluding ydotool's own injection device. Requires membership of the 'input'
         // group; if it can't open any device, SupportsIdleQuery stays false.
         private readonly EvdevActivityMonitor _activityMonitor = new();
+
+        // ydotool has no wheel command, so scrolling is emitted through our own
+        // /dev/uinput device instead.
+        private readonly UinputScrollDevice _scrollDevice = new();
 
         // A virtual cursor: we cannot read the real pointer on Wayland, so we track
         // where we have moved it to. This keeps GetPosition() self-consistent for any
@@ -152,10 +158,16 @@ namespace ellabi.Platform
 
         public void Scroll(LinuxScrollDirection direction, uint amount)
         {
-            // ydotool 1.x has no wheel command; mouse-wheel scrolling is not available
-            // on this backend. Log once and no-op rather than fail.
-            StaticCode.Logger?.Here().Warning(
-                "Scroll is not supported by the ydotool (Wayland) backend; ignoring.");
+            if (!_scrollDevice.IsAvailable)
+            {
+                StaticCode.Logger?.Here().Warning(
+                    "Scroll requested but the uinput scroll device is unavailable; ignoring.");
+                return;
+            }
+
+            // amount is in Windows wheel units (120 = one notch); at least one notch.
+            int notches = (int)Math.Max(1, amount / 120);
+            _scrollDevice.Scroll(direction, notches);
         }
 
         public void KeyPress(string keyName)
@@ -185,10 +197,74 @@ namespace ellabi.Platform
 
         public void ActivateWindow(string windowTitle)
         {
-            // Raising a window by title is not exposed to clients on Wayland.
-            StaticCode.Logger?.Here().Warning(
-                "ActivateWindow is not supported on Wayland; ignoring request for \"{Title}\".",
-                windowTitle);
+            // Wayland gives clients no way to raise a window directly, but KWin (KDE
+            // Plasma) exposes window control through its scripting D-Bus interface. We
+            // run a tiny script that activates the first window whose caption, class or
+            // name contains the search term.
+            if (string.IsNullOrWhiteSpace(windowTitle)) return;
+
+            try
+            {
+                var term = windowTitle.ToLowerInvariant().Replace("\\", "\\\\").Replace("\"", "\\\"");
+                var script =
+                    "var term=\"" + term + "\";\n" +
+                    "var list=(typeof workspace.windowList===\"function\")?workspace.windowList():workspace.clientList();\n" +
+                    "for(var i=0;i<list.length;i++){var w=list[i];" +
+                    "var cap=(w.caption||\"\").toLowerCase();" +
+                    "var cls=(w.resourceClass||\"\").toLowerCase();" +
+                    "var nam=(w.resourceName||\"\").toLowerCase();" +
+                    "if(cap.indexOf(term)>=0||cls.indexOf(term)>=0||nam.indexOf(term)>=0){workspace.activeWindow=w;break;}}";
+
+                var path = Path.Combine(Path.GetTempPath(), $"movemouse-activate-{Guid.NewGuid():N}.js");
+                File.WriteAllText(path, script);
+
+                var loadOut = RunWithOutput("gdbus",
+                    $"call --session --dest org.kde.KWin --object-path /Scripting " +
+                    $"--method org.kde.kwin.Scripting.loadScript \"{path}\"");
+                var match = Regex.Match(loadOut, @"\d+");
+                if (match.Success)
+                {
+                    RunWithOutput("gdbus",
+                        $"call --session --dest org.kde.KWin --object-path /Scripting/Script{match.Value} " +
+                        $"--method org.kde.kwin.Script.run");
+                }
+
+                RunWithOutput("gdbus",
+                    $"call --session --dest org.kde.KWin --object-path /Scripting " +
+                    $"--method org.kde.kwin.Scripting.unloadScript \"{path}\"");
+
+                try { File.Delete(path); } catch { /* ignore */ }
+            }
+            catch (Exception ex)
+            {
+                StaticCode.Logger?.Here().Error(ex.Message);
+            }
+        }
+
+        private static string RunWithOutput(string exe, string args)
+        {
+            try
+            {
+                var psi = new ProcessStartInfo
+                {
+                    FileName = exe,
+                    Arguments = args,
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true
+                };
+                using var proc = Process.Start(psi);
+                if (proc == null) return string.Empty;
+                var output = proc.StandardOutput.ReadToEnd();
+                proc.WaitForExit(3000);
+                return output;
+            }
+            catch (Exception ex)
+            {
+                StaticCode.Logger?.Here().Error(ex.Message);
+                return string.Empty;
+            }
         }
 
         public string VkToKeyName(int vkCode)

@@ -144,11 +144,16 @@ Run `move-mouse`, or pick **Move Mouse** from your application launcher. On star
 
 This requires the app to be able to read those devices, which the [setup above](#fedora-atomic-silverblue--kinoite--wayland) provides by adding you to the `input` group. If the app can't read them, it logs `available=False` and these features stay disabled rather than misbehaving. Auto-Pause is enabled by default; configure it under **Settings → Auto-Pause**.
 
+## Wayland feature coverage
+
+The Wayland (`ydotool`) backend now covers the full action set:
+
+- **Scroll-wheel actions** work via a dedicated virtual wheel device created through `/dev/uinput` (`ydotool` itself has no wheel command).
+- **Activate-window-by-title** works on **KDE Plasma** via KWin's scripting D-Bus interface (matches window caption, class, or name). On other Wayland compositors it is a no-op.
+- **Stop when locked** uses the freedesktop ScreenSaver D-Bus interface; **pause on battery** reads `/sys/class/power_supply`.
+
+The only feature Wayland fundamentally can't provide is the **Position Cursor "Track"** helper (capturing the live pointer location), since clients cannot read the cursor position.
+
 ## Known Issues
 
-- **Wayland feature limits**: A couple of features still can't be supported on the `ydotool` backend, because the underlying tooling doesn't expose them:
-  - **Scroll-wheel actions** — `ydotool` has no wheel command.
-  - **Activate-window-by-title** — not exposed to clients on Wayland.
-
-  Both are no-ops, logged as warnings. Mouse movement, clicks, keystrokes, schedules, and auto-pause all work normally. For the full feature set including these two, run an **X11 session**, where the `xdotool` backend is used.
-- **`/dev/uinput` permissions**: The Wayland backend requires access to `/dev/uinput` and a running `ydotoold` daemon (see setup above). Without them, input simulation silently fails — check the log.
+- **`/dev/uinput` permissions**: The Wayland backend requires access to `/dev/uinput` and a running `ydotoold` daemon (see setup above). The same access powers the scroll device. Without it, input simulation silently fails — check the log.

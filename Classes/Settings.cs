@@ -43,6 +43,7 @@ namespace ellabi.Classes
         private bool? _minimiseOnStop;
         private bool? _enableLogging;
         private bool? _pauseOnBattery;
+        private bool? _stopWhenLocked;
         private LogEventLevel? _logLevel;
         private bool? _showSystemTrayNotifications;
         private bool? _showTaskbarStatus;
@@ -169,6 +170,12 @@ namespace ellabi.Classes
         {
             get { if (_pauseOnBattery == null) _pauseOnBattery = false; return _pauseOnBattery.Value; }
             set { _pauseOnBattery = value; OnPropertyChanged(); }
+        }
+
+        public bool StopWhenLocked
+        {
+            get { if (_stopWhenLocked == null) _stopWhenLocked = false; return _stopWhenLocked.Value; }
+            set { _stopWhenLocked = value; OnPropertyChanged(); }
         }
 
         public LogEventLevel LogLevel

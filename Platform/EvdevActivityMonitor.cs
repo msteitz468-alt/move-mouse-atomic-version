@@ -65,9 +65,10 @@ namespace ellabi.Platform
             {
                 var name = ReadDeviceName(path);
                 if (excludeVirtualDevice && name != null &&
-                    name.Contains("ydotool", StringComparison.OrdinalIgnoreCase))
+                    (name.Contains("ydotool", StringComparison.OrdinalIgnoreCase) ||
+                     name.Contains("MoveMouse", StringComparison.OrdinalIgnoreCase)))
                 {
-                    continue; // our own injection device
+                    continue; // our own injection / scroll devices
                 }
 
                 try

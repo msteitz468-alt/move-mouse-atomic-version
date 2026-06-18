@@ -184,7 +184,7 @@
                                                 <Grid Classes="Row" ColumnDefinitions="120,*"><TextBlock Classes="FieldLabel" Text="Amount"/><NumericUpDown Grid.Column="1" Value="{Binding Distance}" Minimum="1" Maximum="10000" FormatString="0" HorizontalAlignment="Left" Width="120"/></Grid>
                                                 <Grid Classes="Row" ColumnDefinitions="120,*"><TextBlock Classes="FieldLabel" Text="Random"/><ToggleSwitch Grid.Column="1" IsChecked="{Binding Random}"/></Grid>
                                                 <Grid Classes="Row" ColumnDefinitions="120,*"><TextBlock Classes="FieldLabel" Text="Max amount"/><NumericUpDown Grid.Column="1" Value="{Binding UpperDistance}" Minimum="1" Maximum="10000" FormatString="0" HorizontalAlignment="Left" Width="120"/></Grid>
-                                                <TextBlock Text="Note: scroll is not supported on the Wayland backend." Foreground="#c98" FontSize="11" TextWrapping="Wrap"/>
+                                                <TextBlock Text="120 units = one wheel notch. Emitted via a virtual uinput device." Foreground="#888" FontSize="11" TextWrapping="Wrap"/>
                                             </StackPanel>
                                         </DataTemplate>
 
@@ -207,7 +207,7 @@
                                             <StackPanel>
                                                 <Grid Classes="Row" ColumnDefinitions="120,*"><TextBlock Classes="FieldLabel" Text="Match by"/><ComboBox Grid.Column="1" Classes="Field" ItemsSource="{Binding SearchModeValues}" SelectedItem="{Binding Mode}"/></Grid>
                                                 <Grid Classes="Row" ColumnDefinitions="120,*"><TextBlock Classes="FieldLabel" Text="Application"/><TextBox Grid.Column="1" Classes="Field" Text="{Binding Application}"/></Grid>
-                                                <TextBlock Text="Note: window activation is limited on the Wayland backend." Foreground="#c98" FontSize="11" TextWrapping="Wrap"/>
+                                                <TextBlock Text="Matches caption/class/name. Uses KWin scripting (KDE Plasma)." Foreground="#888" FontSize="11" TextWrapping="Wrap"/>
                                             </StackPanel>
                                         </DataTemplate>
 
@@ -272,7 +272,12 @@
                             <ToggleSwitch IsChecked="{Binding Settings.PauseOnBattery}" />
                             <TextBlock Grid.Column="1" Classes="ToggleLabel" Text="Pause when running on battery"/>
                         </Grid>
-                        
+
+                        <Grid ColumnDefinitions="Auto,*">
+                            <ToggleSwitch IsChecked="{Binding Settings.StopWhenLocked}" />
+                            <TextBlock Grid.Column="1" Classes="ToggleLabel" Text="Stop when the screen is locked"/>
+                        </Grid>
+
                         <Grid ColumnDefinitions="Auto,*">
                             <ToggleSwitch IsChecked="{Binding Settings.EnableLogging}" />
                             <TextBlock Grid.Column="1" Classes="ToggleLabel" Text="Enable logging"/>

@@ -1,6 +1,7 @@
 using Avalonia.Threading;
 using ellabi.Actions;
 using ellabi.Classes;
+using ellabi.Platform;
 using ellabi.Jobs;
 using ellabi.Schedules;
 using Quartz;
@@ -37,6 +38,8 @@ namespace ellabi.ViewModels
         private Timer? _countdownTimer;
         private int _countdownSeconds;
         private Timer? _autoPauseCheckTimer;
+        private Timer? _environmentTimer;
+        private bool _pausedForBattery;
         private IScheduler? _quartzScheduler;
 
         // ── Commands ───────────────────────────────────────────────────────
@@ -326,6 +329,7 @@ namespace ellabi.ViewModels
                 ExecuteActionsForTrigger(ActionBase.EventTrigger.Start);
                 ScheduleNextInterval();
                 StartAutoPauseCheck();
+                StartEnvironmentCheck();
             }
             catch (Exception ex)
             {
@@ -344,6 +348,8 @@ namespace ellabi.ViewModels
                 _intervalTimer?.Stop();
                 _countdownTimer?.Stop();
                 _autoPauseCheckTimer?.Stop();
+                _environmentTimer?.Stop();
+                _pausedForBattery = false;
                 CountdownSeconds = 0;
 
                 ExecuteActionsForTrigger(ActionBase.EventTrigger.Stop);
@@ -517,6 +523,51 @@ namespace ellabi.ViewModels
                          idle.TotalSeconds >= Settings.AutoResumeSeconds)
                 {
                     Dispatcher.UIThread.Post(Resume);
+                }
+            }
+            catch (Exception ex)
+            {
+                StaticCode.Logger?.Here().Error(ex.Message);
+            }
+        }
+
+        // ── Power / lock awareness ─────────────────────────────────────────
+        private void StartEnvironmentCheck()
+        {
+            _environmentTimer?.Stop();
+            if (!Settings.PauseOnBattery && !Settings.StopWhenLocked) return;
+
+            _environmentTimer = new Timer(4000) { AutoReset = true };
+            _environmentTimer.Elapsed += OnEnvironmentCheck;
+            _environmentTimer.Start();
+        }
+
+        private void OnEnvironmentCheck(object? sender, ElapsedEventArgs e)
+        {
+            try
+            {
+                // Pause while on battery; resume once mains power returns (only if we
+                // were the ones who paused for battery — don't fight a user-activity pause).
+                if (Settings.PauseOnBattery)
+                {
+                    var onBattery = SystemStateMonitor.IsOnBattery();
+                    if (onBattery && State == AppState.Running)
+                    {
+                        _pausedForBattery = true;
+                        Dispatcher.UIThread.Post(Pause);
+                    }
+                    else if (!onBattery && _pausedForBattery && State == AppState.Paused)
+                    {
+                        _pausedForBattery = false;
+                        Dispatcher.UIThread.Post(Resume);
+                    }
+                }
+
+                // Halt entirely when the session locks.
+                if (Settings.StopWhenLocked && State != AppState.Stopped &&
+                    SystemStateMonitor.IsScreenLocked())
+                {
+                    Dispatcher.UIThread.Post(Stop);
                 }
             }
             catch (Exception ex)
