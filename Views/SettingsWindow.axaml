@@ -2,6 +2,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:ellabi.ViewModels"
         xmlns:actions="clr-namespace:ellabi.Actions"
+        xmlns:schedules="clr-namespace:ellabi.Schedules"
+        xmlns:classes="clr-namespace:ellabi.Classes"
         xmlns:local="clr-namespace:ellabi"
         x:Class="ellabi.Views.SettingsWindow"
         x:DataType="vm:MainWindowViewModel"
@@ -48,6 +50,28 @@
             <Setter Property="Margin" Value="10,10,20,10"/>
             <Setter Property="Padding" Value="20"/>
             <Setter Property="CornerRadius" Value="0" />
+        </Style>
+        <!-- Shared editor field styles (Actions / Schedules / Blackouts) -->
+        <Style Selector="TextBlock.FieldLabel">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="ComboBox.Field">
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Setter Property="Width" Value="180"/>
+            <Setter Property="Background" Value="#222"/>
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+        <Style Selector="TextBox.Field">
+            <Setter Property="Background" Value="#222"/>
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+        <Style Selector="Grid.Row">
+            <Setter Property="Margin" Value="0,0,0,8"/>
+        </Style>
+        <Style Selector="CheckBox.Day">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Margin" Value="0,0,8,0"/>
         </Style>
     </Window.Styles>
 
@@ -300,13 +324,135 @@
 
             <TabItem Header="Schedules">
                 <Border Classes="TabContent">
-                    <TextBlock Text="Schedule configuration is available in full release!" Foreground="White" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                    <Grid ColumnDefinitions="220,*" x:CompileBindings="False">
+                        <!-- Left: schedule list + add/remove -->
+                        <Grid Grid.Column="0" RowDefinitions="*,Auto" Margin="0,0,15,0">
+                            <Border Grid.Row="0" BorderBrush="#333" BorderThickness="0,0,1,0" Padding="0,0,15,0">
+                                <ListBox x:Name="SchedulesList" ItemsSource="{Binding Schedules}"
+                                         SelectedItem="{Binding SelectedSchedule}"
+                                         Background="Transparent" Foreground="White">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Margin="5,3">
+                                                <TextBlock Text="{Binding Action}" Foreground="White"/>
+                                                <TextBlock Text="{Binding CronExpression}" Foreground="#888" FontSize="11"/>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </Border>
+                            <StackPanel Grid.Row="1" Margin="0,8,15,0" Spacing="6">
+                                <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding ScheduleTypeNames}"
+                                          SelectedItem="{Binding SelectedScheduleTypeName}" Background="#222" Foreground="White"/>
+                                <Grid ColumnDefinitions="*,*">
+                                    <Button Grid.Column="0" Content="Add" Command="{Binding AddScheduleCommand}"
+                                            Margin="0,0,4,0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Background="#4582c4" Foreground="White"/>
+                                    <Button Grid.Column="1" Content="Remove" Command="{Binding RemoveScheduleCommand}"
+                                            Margin="4,0,0,0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Background="#5a3030" Foreground="White"/>
+                                </Grid>
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- Right: schedule editor -->
+                        <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
+                            <StackPanel DataContext="{Binding SelectedSchedule}">
+                                <TextBlock Text="Add a schedule to start or stop Move Mouse at set times." Foreground="#888"
+                                           IsVisible="{Binding $parent[ScrollViewer].DataContext, Converter={x:Static ObjectConverters.IsNull}}"/>
+
+                                <Grid Classes="Row" ColumnDefinitions="120,*">
+                                    <TextBlock Classes="FieldLabel" Text="Action"/>
+                                    <ComboBox Grid.Column="1" Classes="Field" ItemsSource="{Binding ScheduleActionValues}" SelectedItem="{Binding Action}"/>
+                                </Grid>
+                                <Grid Classes="Row" ColumnDefinitions="120,*">
+                                    <TextBlock Classes="FieldLabel" Text="Enabled"/>
+                                    <ToggleSwitch Grid.Column="1" IsChecked="{Binding IsEnabled}"/>
+                                </Grid>
+
+                                <Separator Background="#333" Margin="0,4,0,10"/>
+
+                                <ContentControl Content="{Binding}">
+                                    <ContentControl.DataTemplates>
+                                        <DataTemplate DataType="schedules:SimpleSchedule">
+                                            <StackPanel>
+                                                <TextBlock Text="Days" Classes="FieldLabel" Margin="0,0,0,4"/>
+                                                <WrapPanel Margin="0,0,0,10">
+                                                    <CheckBox Classes="Day" Content="Mon" IsChecked="{Binding Monday}"/>
+                                                    <CheckBox Classes="Day" Content="Tue" IsChecked="{Binding Tuesday}"/>
+                                                    <CheckBox Classes="Day" Content="Wed" IsChecked="{Binding Wednesday}"/>
+                                                    <CheckBox Classes="Day" Content="Thu" IsChecked="{Binding Thursday}"/>
+                                                    <CheckBox Classes="Day" Content="Fri" IsChecked="{Binding Friday}"/>
+                                                    <CheckBox Classes="Day" Content="Sat" IsChecked="{Binding Saturday}"/>
+                                                    <CheckBox Classes="Day" Content="Sun" IsChecked="{Binding Sunday}"/>
+                                                </WrapPanel>
+                                                <Grid Classes="Row" ColumnDefinitions="120,*"><TextBlock Classes="FieldLabel" Text="Time"/><TextBox Grid.Column="1" Classes="Field" Width="120" HorizontalAlignment="Left" Text="{Binding TimeString}" Watermark="HH:MM:SS"/></Grid>
+                                                <Grid Classes="Row" ColumnDefinitions="120,*"><TextBlock Classes="FieldLabel" Text="Random delay (s)"/><NumericUpDown Grid.Column="1" Value="{Binding Delay}" Minimum="0" Maximum="3600" FormatString="0" HorizontalAlignment="Left" Width="120"/></Grid>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                        <DataTemplate DataType="schedules:AdvancedSchedule">
+                                            <StackPanel>
+                                                <Grid Classes="Row" ColumnDefinitions="120,*"><TextBlock Classes="FieldLabel" Text="Cron"/><TextBox Grid.Column="1" Classes="Field" Text="{Binding Schedule}" Watermark="0 0 9 ? * MON-FRI"/></Grid>
+                                                <TextBlock Text="Quartz cron format: sec min hour day-of-month month day-of-week." Foreground="#888" FontSize="11" TextWrapping="Wrap"/>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ContentControl.DataTemplates>
+                                </ContentControl>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </Grid>
                 </Border>
             </TabItem>
 
             <TabItem Header="Blackouts">
                 <Border Classes="TabContent">
-                    <TextBlock Text="Blackout configuration is available in full release!" Foreground="White" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                    <Grid ColumnDefinitions="220,*" x:CompileBindings="False">
+                        <!-- Left: blackout list + add/remove -->
+                        <Grid Grid.Column="0" RowDefinitions="*,Auto" Margin="0,0,15,0">
+                            <Border Grid.Row="0" BorderBrush="#333" BorderThickness="0,0,1,0" Padding="0,0,15,0">
+                                <ListBox x:Name="BlackoutsList" ItemsSource="{Binding Blackouts}"
+                                         SelectedItem="{Binding SelectedBlackout}"
+                                         Background="Transparent" Foreground="White">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Margin="5,3">
+                                                <TextBlock Text="{Binding TimeString}" Foreground="White"/>
+                                                <TextBlock Text="{Binding DurationString, StringFormat='for {0}'}" Foreground="#888" FontSize="11"/>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </Border>
+                            <StackPanel Grid.Row="1" Margin="0,8,15,0" Spacing="6">
+                                <Grid ColumnDefinitions="*,*">
+                                    <Button Grid.Column="0" Content="Add" Command="{Binding AddBlackoutCommand}"
+                                            Margin="0,0,4,0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Background="#4582c4" Foreground="White"/>
+                                    <Button Grid.Column="1" Content="Remove" Command="{Binding RemoveBlackoutCommand}"
+                                            Margin="4,0,0,0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Background="#5a3030" Foreground="White"/>
+                                </Grid>
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- Right: blackout editor -->
+                        <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
+                            <StackPanel DataContext="{Binding SelectedBlackout}">
+                                <TextBlock Text="Add a blackout to pause Move Mouse during set times (e.g. overnight)." Foreground="#888"
+                                           IsVisible="{Binding $parent[ScrollViewer].DataContext, Converter={x:Static ObjectConverters.IsNull}}"/>
+
+                                <TextBlock Text="Days" Classes="FieldLabel" Margin="0,0,0,4"/>
+                                <WrapPanel Margin="0,0,0,10">
+                                    <CheckBox Classes="Day" Content="Mon" IsChecked="{Binding Monday}"/>
+                                    <CheckBox Classes="Day" Content="Tue" IsChecked="{Binding Tuesday}"/>
+                                    <CheckBox Classes="Day" Content="Wed" IsChecked="{Binding Wednesday}"/>
+                                    <CheckBox Classes="Day" Content="Thu" IsChecked="{Binding Thursday}"/>
+                                    <CheckBox Classes="Day" Content="Fri" IsChecked="{Binding Friday}"/>
+                                    <CheckBox Classes="Day" Content="Sat" IsChecked="{Binding Saturday}"/>
+                                    <CheckBox Classes="Day" Content="Sun" IsChecked="{Binding Sunday}"/>
+                                </WrapPanel>
+                                <Grid Classes="Row" ColumnDefinitions="120,*"><TextBlock Classes="FieldLabel" Text="Start time"/><TextBox Grid.Column="1" Classes="Field" Width="120" HorizontalAlignment="Left" Text="{Binding TimeString}" Watermark="HH:MM:SS"/></Grid>
+                                <Grid Classes="Row" ColumnDefinitions="120,*"><TextBlock Classes="FieldLabel" Text="Duration"/><TextBox Grid.Column="1" Classes="Field" Width="120" HorizontalAlignment="Left" Text="{Binding DurationString}" Watermark="HH:MM:SS"/></Grid>
+                                <Grid Classes="Row" ColumnDefinitions="120,*"><TextBlock Classes="FieldLabel" Text="Enabled"/><ToggleSwitch Grid.Column="1" IsChecked="{Binding IsEnabled}"/></Grid>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </Grid>
                 </Border>
             </TabItem>
 

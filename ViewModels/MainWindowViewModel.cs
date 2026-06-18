@@ -46,6 +46,10 @@ namespace ellabi.ViewModels
         public Utilities.RelayCommand SaveSettingsCommand { get; }
         public Utilities.RelayCommand AddActionCommand { get; }
         public Utilities.RelayCommand RemoveActionCommand { get; }
+        public Utilities.RelayCommand AddScheduleCommand { get; }
+        public Utilities.RelayCommand RemoveScheduleCommand { get; }
+        public Utilities.RelayCommand AddBlackoutCommand { get; }
+        public Utilities.RelayCommand RemoveBlackoutCommand { get; }
 
         // ── Bound properties ───────────────────────────────────────────────
         public AppState State
@@ -121,6 +125,37 @@ namespace ellabi.ViewModels
             set { _selectedActionTypeName = value; OnPropertyChanged(); }
         }
 
+        // ── Schedules editor ───────────────────────────────────────────────
+        private ScheduleBase? _selectedSchedule;
+        private string _selectedScheduleTypeName = "Simple";
+
+        public ObservableCollection<ScheduleBase> Schedules { get; } = new();
+
+        public ScheduleBase? SelectedSchedule
+        {
+            get => _selectedSchedule;
+            set { _selectedSchedule = value; OnPropertyChanged(); RaiseCommandsChanged(); }
+        }
+
+        public IReadOnlyList<string> ScheduleTypeNames { get; } = new[] { "Simple", "Advanced" };
+
+        public string SelectedScheduleTypeName
+        {
+            get => _selectedScheduleTypeName;
+            set { _selectedScheduleTypeName = value; OnPropertyChanged(); }
+        }
+
+        // ── Blackouts editor ───────────────────────────────────────────────
+        private Blackout? _selectedBlackout;
+
+        public ObservableCollection<Blackout> Blackouts { get; } = new();
+
+        public Blackout? SelectedBlackout
+        {
+            get => _selectedBlackout;
+            set { _selectedBlackout = value; OnPropertyChanged(); RaiseCommandsChanged(); }
+        }
+
         public int CountdownSeconds
         {
             get => _countdownSeconds;
@@ -138,6 +173,10 @@ namespace ellabi.ViewModels
             SaveSettingsCommand = new Utilities.RelayCommand(_ => SaveSettings());
             AddActionCommand    = new Utilities.RelayCommand(_ => AddAction());
             RemoveActionCommand = new Utilities.RelayCommand(_ => RemoveAction(), _ => SelectedAction != null);
+            AddScheduleCommand    = new Utilities.RelayCommand(_ => AddSchedule());
+            RemoveScheduleCommand = new Utilities.RelayCommand(_ => RemoveSchedule(), _ => SelectedSchedule != null);
+            AddBlackoutCommand    = new Utilities.RelayCommand(_ => AddBlackout());
+            RemoveBlackoutCommand = new Utilities.RelayCommand(_ => RemoveBlackout(), _ => SelectedBlackout != null);
 
             LoadSettings();
 
@@ -159,6 +198,7 @@ namespace ellabi.ViewModels
             }
 
             RebuildActionsCollection();
+            RebuildScheduleAndBlackoutCollections();
 
             StaticCode.ScheduleArrived         += OnScheduleArrived;
             StaticCode.UpdateAvailablityChanged += v => UpdateAvailable = v;
@@ -214,6 +254,65 @@ namespace ellabi.ViewModels
             "Sleep"                => new SleepAction                { Name = "Sleep",           IsEnabled = true, Repeat = true },
             _                      => new MoveMouseCursorAction     { Name = "Move Cursor", Distance = 100, IsEnabled = true, Repeat = true },
         };
+
+        // ── Schedules add / remove ─────────────────────────────────────────
+        private void RebuildScheduleAndBlackoutCollections()
+        {
+            Schedules.Clear();
+            if (Settings.Schedules != null)
+                foreach (var s in Settings.Schedules) Schedules.Add(s);
+            SelectedSchedule = Schedules.FirstOrDefault();
+
+            Blackouts.Clear();
+            if (Settings.Blackouts != null)
+                foreach (var b in Settings.Blackouts) Blackouts.Add(b);
+            SelectedBlackout = Blackouts.FirstOrDefault();
+        }
+
+        private void AddSchedule()
+        {
+            ScheduleBase schedule = SelectedScheduleTypeName == "Advanced"
+                ? new AdvancedSchedule { Schedule = "0 0 9 ? * MON-FRI" }
+                : new SimpleSchedule();
+            Schedules.Add(schedule);
+            SyncSchedulesToSettings();
+            SelectedSchedule = schedule;
+        }
+
+        private void RemoveSchedule()
+        {
+            if (SelectedSchedule == null) return;
+            var idx = Schedules.IndexOf(SelectedSchedule);
+            Schedules.Remove(SelectedSchedule);
+            SyncSchedulesToSettings();
+            SelectedSchedule = Schedules.Count == 0 ? null : Schedules[Math.Min(idx, Schedules.Count - 1)];
+        }
+
+        private void SyncSchedulesToSettings()
+        {
+            Settings.Schedules = Schedules.ToArray();
+            RefreshQuartzSchedules();
+        }
+
+        // ── Blackouts add / remove ─────────────────────────────────────────
+        private void AddBlackout()
+        {
+            var blackout = new Blackout();
+            Blackouts.Add(blackout);
+            SyncBlackoutsToSettings();
+            SelectedBlackout = blackout;
+        }
+
+        private void RemoveBlackout()
+        {
+            if (SelectedBlackout == null) return;
+            var idx = Blackouts.IndexOf(SelectedBlackout);
+            Blackouts.Remove(SelectedBlackout);
+            SyncBlackoutsToSettings();
+            SelectedBlackout = Blackouts.Count == 0 ? null : Blackouts[Math.Min(idx, Blackouts.Count - 1)];
+        }
+
+        private void SyncBlackoutsToSettings() => Settings.Blackouts = Blackouts.ToArray();
 
         // ── Start / Stop / Pause ───────────────────────────────────────────
         public void Start()
@@ -527,6 +626,9 @@ namespace ellabi.ViewModels
             try
             {
                 SyncActionsToSettings();
+                Settings.Schedules = Schedules.ToArray();
+                Settings.Blackouts = Blackouts.ToArray();
+                RefreshQuartzSchedules();
                 Directory.CreateDirectory(StaticCode.WorkingDirectory);
                 var path = StaticCode.SettingsXmlPath;
                 var serializer = new XmlSerializer(typeof(Settings));
