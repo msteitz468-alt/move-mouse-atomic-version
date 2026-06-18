@@ -487,13 +487,18 @@
         </TabControl>
         
         <Border Grid.Row="1" Background="#11151c" Padding="0,0,20,0">
-            <Button Content="Close" 
-                    HorizontalAlignment="Right" 
-                    VerticalAlignment="Center"
-                    Width="80" HorizontalContentAlignment="Center"
-                    Background="#333" Foreground="White"
-                    Command="{Binding SaveSettingsCommand}"
-                    Click="OnCloseClick" />
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Spacing="10">
+                <Button Content="Save"
+                        Width="90" HorizontalContentAlignment="Center"
+                        Background="#4582c4" Foreground="White"
+                        Command="{Binding SaveSettingsCommand}"
+                        Click="OnSaveClick" />
+                <Button Content="Save &amp; Close"
+                        Width="110" HorizontalContentAlignment="Center"
+                        Background="#333" Foreground="White"
+                        Command="{Binding SaveSettingsCommand}"
+                        Click="OnCloseClick" />
+            </StackPanel>
         </Border>
     </Grid>
 </Window>

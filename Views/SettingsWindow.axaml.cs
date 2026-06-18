@@ -11,9 +11,23 @@ namespace ellabi.Views
         public SettingsWindow()
         {
             InitializeComponent();
+            // Persist settings however the window is closed (button, title-bar X, Esc).
+            Closing += (_, _) => (DataContext as MainWindowViewModel)?.SaveSettings();
         }
 
         private void OnCloseClick(object? sender, RoutedEventArgs e) => Close();
+
+        private async void OnSaveClick(object? sender, RoutedEventArgs e)
+        {
+            // The button's Command performs the save; give a brief visual confirmation.
+            if (sender is Button button)
+            {
+                var original = button.Content;
+                button.Content = "Saved ✓";
+                await System.Threading.Tasks.Task.Delay(1200);
+                button.Content = original;
+            }
+        }
 
         private void OnGitHubClick(object? sender, RoutedEventArgs e)
         {
