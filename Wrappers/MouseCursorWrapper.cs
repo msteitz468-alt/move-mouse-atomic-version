@@ -20,7 +20,11 @@ namespace ellabi.Wrappers
         {
             try
             {
-                if (BreakOnUserActivity && _previousLocations.Count > 0 && !_previousLocations.Contains(GetCursorPosition()))
+                // Break-on-user-activity works by noticing the pointer moved to a spot we
+                // didn't put it. That requires reading the real cursor, which Wayland
+                // forbids; on such backends we skip the check and keep moving.
+                if (BreakOnUserActivity && (StaticCode.InputProvider?.SupportsPositionQuery ?? false)
+                    && _previousLocations.Count > 0 && !_previousLocations.Contains(GetCursorPosition()))
                 {
                     UserActivityDetected = true;
                     return;

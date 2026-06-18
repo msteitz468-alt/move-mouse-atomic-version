@@ -322,6 +322,11 @@ namespace ellabi.ViewModels
         {
             try
             {
+                // Auto-pause/resume depend on a real idle-time reading; on backends that
+                // cannot provide one (e.g. Wayland) skip rather than act on a zero value.
+                if (StaticCode.InputProvider?.SupportsIdleQuery != true)
+                    return;
+
                 var idle = StaticCode.GetLastInputTime();
 
                 if (Settings.AutoPause && State == AppState.Running && idle.TotalSeconds < 2)

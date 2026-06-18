@@ -8,6 +8,20 @@ namespace ellabi.Platform
 
     public interface IInputProvider
     {
+        /// <summary>
+        /// True if GetPosition() returns the real cursor location. False on backends
+        /// (e.g. Wayland/uinput) where the compositor forbids reading the pointer, in
+        /// which case position-based features (abort-on-user-activity) must be skipped.
+        /// </summary>
+        bool SupportsPositionQuery { get; }
+
+        /// <summary>
+        /// True if GetIdleTime() returns a real value. False on backends (e.g. KDE
+        /// Wayland) with no idle point-query, in which case auto-pause/auto-resume
+        /// must be skipped rather than act on a meaningless zero.
+        /// </summary>
+        bool SupportsIdleQuery { get; }
+
         /// <summary>Move cursor by (dx, dy) pixels relative to current position.</summary>
         void MoveRelative(int dx, int dy);
 

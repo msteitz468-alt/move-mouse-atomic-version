@@ -14,12 +14,15 @@ Built with **.NET 8** and **Avalonia UI**, this is an open-source, native Linux 
 
 ## Requirements
 
-Move Mouse Linux relies on native X11 tools to poll system idle times and simulate hardware input. It requires the following packages to be installed:
+Move Mouse Linux simulates hardware input through a pluggable backend and selects one automatically based on your session:
 
-```bash
-sudo apt install xdotool xprintidle wmctrl
-```
-*(Note for Wayland users: The utility uses Xwayland compatibility features to function. Ensure apps you want to keep awake are running in compatible sessions).*
+- **X11 sessions** use `xdotool` / `xprintidle` / `wmctrl`:
+  ```bash
+  sudo apt install xdotool xprintidle wmctrl
+  ```
+- **Wayland sessions** (e.g. KDE Plasma, GNOME) use `ydotool`, which injects input through the kernel's `/dev/uinput` device and therefore works where X11 automation is blocked. See the [Fedora Atomic & Wayland](#fedora-atomic-silverblue--kinoite--wayland) section below for setup.
+
+The backend is chosen from `XDG_SESSION_TYPE`. You can override it with the `MOVEMOUSE_INPUT` environment variable (`xdotool` or `ydotool`).
 
 ## Installation
 
@@ -45,6 +48,101 @@ cd move-mouse-linux
 
 This will automatically publish a self-contained single-file binary and build a standard Debian package inside the project directory.
 
+### Fedora Atomic (Silverblue / Kinoite) & Wayland
+
+Fedora Atomic desktops are immutable (no `apt`, read-only `/usr`) and default to a Wayland session, so the `.deb` and the X11 tools don't apply. Move Mouse still works: it ships a **self-contained .NET binary** (no .NET runtime needed) and a Wayland input backend driven by `ydotool`.
+
+The steps below install it entirely in your home directory, then add the one system package (`ydotool`) and the permissions it needs to inject input.
+
+#### 1. Install the application (rootless, no reboot)
+
+You can either build from source or extract the prebuilt `.deb` payload. Both drop a self-contained binary into `~/.local`.
+
+**Option A — extract the prebuilt `.deb`** (the package is just an `ar` archive; `dpkg` is not required):
+
+```bash
+mkdir -p /tmp/mm && cd /tmp/mm
+ar x /path/to/move-mouse_4.0.0-1_amd64.deb
+mkdir -p out && tar xf data.tar.zst -C out
+
+mkdir -p ~/.local/lib/move-mouse ~/.local/bin ~/.local/share/applications
+cp -r out/usr/lib/move-mouse/. ~/.local/lib/move-mouse/
+chmod 755 ~/.local/lib/move-mouse/move-mouse
+ln -sf ~/.local/lib/move-mouse/move-mouse ~/.local/bin/move-mouse
+
+# Desktop launcher with an absolute Exec path
+sed 's|^Exec=move-mouse|Exec='"$HOME"'/.local/bin/move-mouse|' \
+    out/usr/share/applications/move-mouse.desktop > ~/.local/share/applications/move-mouse.desktop
+update-desktop-database ~/.local/share/applications 2>/dev/null || true
+```
+
+**Option B — build from source** in a [Toolbx](https://containertoolbx.org/) container (the host has no .NET SDK):
+
+```bash
+toolbox create -y dotnet-build
+toolbox run -c dotnet-build sudo dnf install -y dotnet-sdk-8.0
+toolbox run -c dotnet-build dotnet publish MoveMouseLinux.csproj \
+    -c Release -r linux-x64 --self-contained true \
+    -p:PublishSingleFile=true -p:DebugType=none -p:EnableCompressionInSingleFile=true \
+    -o ~/.local/lib/move-mouse
+ln -sf ~/.local/lib/move-mouse/move-mouse ~/.local/bin/move-mouse
+```
+
+Make sure `~/.local/bin` is on your `PATH` (it is by default on Fedora).
+
+#### 2. Install `ydotool` and grant `/dev/uinput` access (root + one reboot)
+
+```bash
+# Layer ydotool onto the base image
+rpm-ostree install ydotool
+
+# Let your user open /dev/uinput via a udev rule + the 'input' group
+echo 'KERNEL=="uinput", GROUP="input", MODE="0660", OPTIONS+="static_node=uinput"' \
+  | sudo tee /etc/udev/rules.d/60-ydotool-uinput.rules
+sudo usermod -aG input "$USER"
+
+# Reboot to apply the layered package, group membership, and udev rule
+systemctl reboot
+```
+
+#### 3. Run the `ydotoold` daemon as a user service
+
+Move Mouse talks to the `ydotoold` daemon over a socket in `$XDG_RUNTIME_DIR`. Create a user service:
+
+```bash
+mkdir -p ~/.config/systemd/user
+cat > ~/.config/systemd/user/ydotoold.service <<'EOF'
+[Unit]
+Description=ydotoold virtual input daemon (for Move Mouse on Wayland)
+Documentation=man:ydotoold(8)
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=2
+ExecStart=/usr/bin/ydotoold --socket-path=%t/.ydotool_socket --socket-perm=0600
+
+[Install]
+WantedBy=default.target
+EOF
+
+systemctl --user daemon-reload
+systemctl --user enable --now ydotoold.service
+systemctl --user status ydotoold.service   # expect: active (running)
+```
+
+#### 4. Launch
+
+Run `move-mouse`, or pick **Move Mouse** from your application launcher. On startup the log
+(`$XDG_RUNTIME_DIR/move-mouse/Move Mouse.log`) should read `Selecting input backend: "ydotool"`.
+
+**Troubleshooting:** if the cursor doesn't move, check that log. A `failed to connect socket .../.ydotool_socket` line means `ydotoold` isn't running — verify step 3 and that you rebooted after step 2.
+
 ## Known Issues
 
-- **Wayland Native Apps**: True Wayland-native compositors fiercely restrict global programmatic cursor movement. Move Mouse relies on `xdotool` logic and works optimally under X11 or when moving the pointer across Xwayland windows.
+- **Wayland feature limits**: On Wayland the compositor forbids clients from reading the pointer position or querying idle time. The `ydotool` backend therefore cannot support:
+  - **Auto-Pause / Auto-Resume** and **break-on-user-activity** (no idle/position query) — these are automatically disabled.
+  - **Scroll-wheel actions** and **activate-window-by-title** (not exposed by `ydotool`) — these are no-ops, logged as warnings.
+
+  Mouse movement, clicks, and keystrokes — the core keep-alive features — work normally. If you need the auto-pause behaviour, run an **X11 session** instead, where the `xdotool` backend provides the full feature set.
+- **`/dev/uinput` permissions**: The Wayland backend requires access to `/dev/uinput` and a running `ydotoold` daemon (see setup above). Without them, input simulation silently fails — check the log.

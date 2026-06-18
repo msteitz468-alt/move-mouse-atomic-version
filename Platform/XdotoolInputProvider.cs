@@ -72,6 +72,10 @@ namespace ellabi.Platform
             [0xB3] = "XF86AudioPlay",
         };
 
+        // X11 can read the pointer and xprintidle reports idle time.
+        public bool SupportsPositionQuery => true;
+        public bool SupportsIdleQuery => true;
+
         public void MoveRelative(int dx, int dy)
         {
             Run("xdotool", $"mousemove_relative --sync -- {dx} {dy}");
