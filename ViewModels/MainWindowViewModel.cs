@@ -28,6 +28,9 @@ namespace ellabi.ViewModels
         // ── State ──────────────────────────────────────────────────────────
         public enum AppState { Stopped, Running, Paused }
 
+        /// <summary>Richer visual state for the status ring colour.</summary>
+        public enum VisualStatus { Idle, Running, Executing, Paused, Sleeping, Battery }
+
         private AppState _state = AppState.Stopped;
         private string _statusText = "Stopped";
         private bool _updateAvailable;
@@ -79,6 +82,16 @@ namespace ellabi.ViewModels
         public bool IsRunning => State == AppState.Running;
         public bool IsStopped => State == AppState.Stopped;
         public bool IsPaused  => State == AppState.Paused;
+
+        private VisualStatus _status = VisualStatus.Idle;
+        public VisualStatus Status
+        {
+            get => _status;
+            private set { _status = value; OnPropertyChanged(); }
+        }
+
+        /// <summary>Set the visual status from any thread (the ring binding is UI-bound).</summary>
+        private void SetStatus(VisualStatus status) => Dispatcher.UIThread.Post(() => Status = status);
 
         public string StatusText
         {
@@ -324,6 +337,7 @@ namespace ellabi.ViewModels
             {
                 if (State == AppState.Running) return;
                 State = AppState.Running;
+                SetStatus(VisualStatus.Running);
                 StaticCode.Logger?.Here().Information("Start");
 
                 ExecuteActionsForTrigger(ActionBase.EventTrigger.Start);
@@ -343,6 +357,7 @@ namespace ellabi.ViewModels
             {
                 if (State == AppState.Stopped) return;
                 State = AppState.Stopped;
+                SetStatus(VisualStatus.Idle);
                 StaticCode.Logger?.Here().Information("Stop");
 
                 _intervalTimer?.Stop();
@@ -367,6 +382,7 @@ namespace ellabi.ViewModels
             {
                 if (State != AppState.Running) return;
                 State = AppState.Paused;
+                SetStatus(_pausedForBattery ? VisualStatus.Battery : VisualStatus.Paused);
                 StaticCode.Logger?.Here().Information("Pause");
                 _intervalTimer?.Stop();
                 _countdownTimer?.Stop();
@@ -383,6 +399,7 @@ namespace ellabi.ViewModels
             {
                 if (State != AppState.Paused) return;
                 State = AppState.Running;
+                SetStatus(VisualStatus.Running);
                 StaticCode.Logger?.Here().Information("Resume");
                 ScheduleNextInterval();
             }
@@ -427,9 +444,10 @@ namespace ellabi.ViewModels
             {
                 if (State != AppState.Running) return;
 
-                // Check blackout periods
-                if (IsInBlackout()) { ScheduleNextInterval(); return; }
+                // Check blackout periods — show the "sleeping" colour while dormant.
+                if (IsInBlackout()) { SetStatus(VisualStatus.Sleeping); ScheduleNextInterval(); return; }
 
+                SetStatus(VisualStatus.Executing);
                 ExecuteActionsForTrigger(ActionBase.EventTrigger.Interval);
 
                 // Default mouse wiggle if no interval actions are configured
@@ -439,6 +457,10 @@ namespace ellabi.ViewModels
                     StaticCode.InputProvider?.MoveRelative(5, 0);
                     StaticCode.InputProvider?.MoveRelative(-5, 0);
                 }
+
+                // Brief red flash, then back to the waiting (green) colour.
+                Thread.Sleep(200);
+                if (State == AppState.Running) SetStatus(VisualStatus.Running);
 
                 ScheduleNextInterval();
             }

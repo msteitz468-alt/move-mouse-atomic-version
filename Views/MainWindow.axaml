@@ -18,7 +18,7 @@
 
     <Grid>
         <!-- The background glowing ring -->
-        <Ellipse Stroke="{Binding State, Converter={StaticResource StateToBrushConverter}}" 
+        <Ellipse Stroke="{Binding Status, Converter={StaticResource StateToBrushConverter}}"
                  StrokeThickness="12" 
                  Width="240" Height="240"
                  Fill="#1E1E2E" />

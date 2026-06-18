@@ -252,10 +252,24 @@
                             <NumericUpDown Grid.Column="1" Value="{Binding Settings.LowerInterval}" Minimum="1" Maximum="3600" FormatString="0" Width="100" HorizontalAlignment="Left"/>
                             <TextBlock Grid.Column="1" Text="seconds" VerticalAlignment="Center" Foreground="White" Margin="110,0,0,0"/>
                         </Grid>
-                        
+
+                        <Grid ColumnDefinitions="Auto,Auto,Auto,*" Margin="0,0,0,15">
+                            <ToggleSwitch IsChecked="{Binding Settings.RandomInterval}"/>
+                            <TextBlock Grid.Column="1" Classes="ToggleLabel" Text="up to" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                            <NumericUpDown Grid.Column="2" Value="{Binding Settings.UpperInterval}" Minimum="1" Maximum="3600" FormatString="0" Width="100"/>
+                            <TextBlock Grid.Column="3" Classes="ToggleLabel" Text="seconds (random interval)" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                        </Grid>
+
                         <Grid ColumnDefinitions="Auto,*">
                             <ToggleSwitch IsChecked="{Binding Settings.AutoPause}" />
                             <TextBlock Grid.Column="1" Classes="ToggleLabel" Text="Automatically stop when user activity detected"/>
+                        </Grid>
+
+                        <Grid ColumnDefinitions="Auto,Auto,Auto,*">
+                            <ToggleSwitch IsChecked="{Binding Settings.AutoResume}"/>
+                            <TextBlock Grid.Column="1" Classes="ToggleLabel" Text="Resume after" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                            <NumericUpDown Grid.Column="2" Value="{Binding Settings.AutoResumeSeconds}" Minimum="1" Maximum="3600" FormatString="0" Width="90"/>
+                            <TextBlock Grid.Column="3" Classes="ToggleLabel" Text="seconds of inactivity" VerticalAlignment="Center" Margin="10,0,0,0"/>
                         </Grid>
                         
                         <Grid ColumnDefinitions="Auto,*">
