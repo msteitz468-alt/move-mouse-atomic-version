@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
+using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 
@@ -72,18 +73,23 @@ namespace ellabi.Platform
             [0xB3] = "XF86AudioPlay",
         };
 
-        // X11 can read the pointer and xprintidle reports idle time.
+        // X11 can read the pointer; idle time needs xprintidle. Without it GetIdleTime()
+        // can only return zero, which would make auto-pause fire constantly.
         public bool SupportsPositionQuery => true;
-        public bool SupportsIdleQuery => true;
+        public bool SupportsIdleQuery { get; } = IsOnPath("xprintidle");
+
+        // xprintidle's idle timer is reset by our own xdotool input too; this tells the
+        // two apart so auto-pause only reacts to the user.
+        private readonly InjectedInputFilter _injectedInput = new(DateTime.UtcNow);
 
         public void MoveRelative(int dx, int dy)
         {
-            Run("xdotool", $"mousemove_relative --sync -- {dx} {dy}");
+            Inject($"mousemove_relative --sync -- {dx} {dy}");
         }
 
         public void MoveTo(int x, int y)
         {
-            Run("xdotool", $"mousemove --sync {x} {y}");
+            Inject($"mousemove --sync {x} {y}");
         }
 
         public Point GetPosition()
@@ -97,17 +103,17 @@ namespace ellabi.Platform
 
         public void Click(LinuxMouseButton button)
         {
-            Run("xdotool", $"click {(int)button}");
+            Inject($"click {(int)button}");
         }
 
         public void MouseDown(LinuxMouseButton button)
         {
-            Run("xdotool", $"mousedown {(int)button}");
+            Inject($"mousedown {(int)button}");
         }
 
         public void MouseUp(LinuxMouseButton button)
         {
-            Run("xdotool", $"mouseup {(int)button}");
+            Inject($"mouseup {(int)button}");
         }
 
         public void Scroll(LinuxScrollDirection direction, uint amount)
@@ -124,12 +130,12 @@ namespace ellabi.Platform
             // amount / 120 = Windows wheel notches; clamp to at least 1
             uint notches = Math.Max(1, amount / 120);
             for (uint i = 0; i < notches; i++)
-                Run("xdotool", $"click {button}");
+                Inject($"click {button}");
         }
 
         public void KeyPress(string keyName)
         {
-            Run("xdotool", $"key {keyName}");
+            Inject($"key {keyName}");
         }
 
         public TimeSpan GetIdleTime()
@@ -138,7 +144,7 @@ namespace ellabi.Platform
             {
                 var ms = RunWithOutput("xprintidle", "").Trim();
                 if (long.TryParse(ms, out var milliseconds))
-                    return TimeSpan.FromMilliseconds(milliseconds);
+                    return _injectedInput.Filter(TimeSpan.FromMilliseconds(milliseconds), DateTime.UtcNow);
             }
             catch
             {
@@ -158,6 +164,19 @@ namespace ellabi.Platform
         {
             return VkMap.TryGetValue(vkCode, out var name) ? name : $"0x{vkCode:X2}";
         }
+
+        /// <summary>Run an xdotool command that generates input, recording it as ours.</summary>
+        private int Inject(string args)
+        {
+            _injectedInput.BeginInjection(DateTime.UtcNow);
+            try { return Run("xdotool", args); }
+            finally { _injectedInput.EndInjection(DateTime.UtcNow); }
+        }
+
+        private static bool IsOnPath(string exe) =>
+            (Environment.GetEnvironmentVariable("PATH") ?? string.Empty)
+                .Split(':', StringSplitOptions.RemoveEmptyEntries)
+                .Any(dir => File.Exists(Path.Combine(dir, exe)));
 
         private static int Run(string exe, string args)
         {
