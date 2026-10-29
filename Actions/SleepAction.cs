@@ -55,7 +55,8 @@ namespace ellabi.Actions
                 StaticCode.Logger?.Here().Information(ToString());
                 var sleep = TimeSpan.FromSeconds(
                     Random ? new System.Random().Next((int)Seconds, (int)UpperSeconds) : Seconds);
-                Thread.Sleep(sleep);
+                // Wakes early if the run is paused or stopped.
+                CancellationToken.WaitHandle.WaitOne(sleep);
             }
             catch (Exception ex)
             {

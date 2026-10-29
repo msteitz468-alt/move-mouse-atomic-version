@@ -120,6 +120,8 @@ namespace ellabi.Actions
 
                     foreach (var vk in _keystrokes)
                     {
+                        if (CancellationToken.IsCancellationRequested) break;
+
                         var userActive =
                             (canDetectByPosition && initialPos != new MouseCursorWrapper().GetCursorPosition()) ||
                             (canDetectByIdle && (provider!.GetIdleTime() < TimeSpan.FromMilliseconds(750)));
@@ -134,7 +136,7 @@ namespace ellabi.Actions
                         StaticCode.InputProvider?.KeyPress(keyName);
 
                         if (Pause)
-                            System.Threading.Thread.Sleep((int)(PauseInterval * 1000));
+                            CancellationToken.WaitHandle.WaitOne((int)(PauseInterval * 1000));
                     }
                 }
                 else // Simultaneous

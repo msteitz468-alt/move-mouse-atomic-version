@@ -62,7 +62,8 @@ namespace ellabi.Actions
                 StaticCode.InputProvider?.MouseDown(platformButton);
 
                 if (Hold)
-                    Thread.Sleep(Convert.ToInt32(1000 * HoldInterval));
+                    // Wakes early if the run is paused or stopped; the button is still released below.
+                    CancellationToken.WaitHandle.WaitOne(Convert.ToInt32(1000 * HoldInterval));
 
                 StaticCode.InputProvider?.MouseUp(platformButton);
             }

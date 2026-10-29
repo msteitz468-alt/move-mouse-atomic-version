@@ -10,7 +10,9 @@
         Background="Transparent"
         TransparencyLevelHint="Transparent"
         CanResize="False"
-        PointerPressed="OnPointerPressed">
+        PointerPressed="OnPointerPressed"
+        PointerMoved="OnPointerMoved"
+        PointerReleased="OnPointerReleased">
 
     <Window.Resources>
         <vm:StateToBrushConverter x:Key="StateToBrushConverter" />

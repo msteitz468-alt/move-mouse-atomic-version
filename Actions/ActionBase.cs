@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Threading;
 using System.Xml.Serialization;
 
 namespace ellabi.Actions
@@ -72,6 +73,12 @@ namespace ellabi.Actions
         [XmlIgnore] public int IntervalExecutionCount { get; set; }
         [XmlIgnore] public bool InterruptsIdleTime { get; set; }
         [XmlIgnore] public bool Aborted { get; set; }
+
+        /// <summary>
+        /// Signalled when the run this action belongs to is paused or stopped; actions
+        /// that take a while (moves, sleeps, holds, key sequences) should bail out early.
+        /// </summary>
+        [XmlIgnore] public CancellationToken CancellationToken { get; set; }
 
         protected ActionBase()
         {

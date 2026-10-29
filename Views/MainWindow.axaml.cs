@@ -80,24 +80,43 @@ namespace ellabi.Views
             trayIcon.Menu = menu;
         }
 
+        // A left press toggles Start/Stop only if it is released without moving; moving
+        // the pointer past this many pixels turns it into a window drag instead.
+        private const double DragThreshold = 4;
+        private PointerPressedEventArgs? _pressArgs;
+        private Point _pressPoint;
+
         public void OnPointerPressed(object? sender, PointerPressedEventArgs e)
         {
-            var properties = e.GetCurrentPoint(this).Properties;
-            if (properties.IsLeftButtonPressed)
-            {
-                // Single left click to toggle Start/Stop state
-                if (e.ClickCount == 1)
-                {
-                    if (_vm != null)
-                    {
-                        if (_vm.IsRunning)
-                            _vm.Stop();
-                        else
-                            _vm.Start();
-                    }
-                }
-                BeginMoveDrag(e);
-            }
+            if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
+
+            // Ignore the second press of a double-click so it doesn't toggle twice.
+            _pressArgs = e.ClickCount == 1 ? e : null;
+            _pressPoint = e.GetPosition(this);
+        }
+
+        public void OnPointerMoved(object? sender, PointerEventArgs e)
+        {
+            if (_pressArgs == null) return;
+
+            var delta = e.GetPosition(this) - _pressPoint;
+            if (Math.Abs(delta.X) < DragThreshold && Math.Abs(delta.Y) < DragThreshold) return;
+
+            var press = _pressArgs;
+            _pressArgs = null; // a drag, not a click
+            BeginMoveDrag(press);
+        }
+
+        public void OnPointerReleased(object? sender, PointerReleasedEventArgs e)
+        {
+            if (_pressArgs == null || e.InitialPressMouseButton != MouseButton.Left) return;
+            _pressArgs = null;
+
+            if (_vm == null) return;
+            if (_vm.IsRunning)
+                _vm.Stop();
+            else
+                _vm.Start();
         }
 
         private void OnSettingsClick(object? sender, RoutedEventArgs e)

@@ -117,15 +117,19 @@ namespace ellabi.Actions
                     ? new System.Random().Next(Distance, UpperDistance)
                     : Distance;
 
-                var mcw = new MouseCursorWrapper { BreakOnUserActivity = AbortIfUserActivityDetected };
+                var mcw = new MouseCursorWrapper
+                {
+                    BreakOnUserActivity = AbortIfUserActivityDetected,
+                    CancellationToken = CancellationToken
+                };
 
                 switch (Direction)
                 {
                     case CursorDirection.Square:
                         mcw.MoveEast(distance, _delay);
-                        if (!mcw.UserActivityDetected) mcw.MoveSouth(distance, _delay);
-                        if (!mcw.UserActivityDetected) mcw.MoveWest(distance, _delay);
-                        if (!mcw.UserActivityDetected) mcw.MoveNorth(distance, _delay);
+                        if (!mcw.Interrupted) mcw.MoveSouth(distance, _delay);
+                        if (!mcw.Interrupted) mcw.MoveWest(distance, _delay);
+                        if (!mcw.Interrupted) mcw.MoveNorth(distance, _delay);
                         break;
                     case CursorDirection.North:     mcw.MoveNorth(distance, _delay); break;
                     case CursorDirection.East:      mcw.MoveEast(distance, _delay); break;
@@ -137,19 +141,19 @@ namespace ellabi.Actions
                     case CursorDirection.NorthWest: mcw.MoveNorthWest(distance, _delay); break;
                     case CursorDirection.UpAndDown:
                         mcw.MoveNorth(distance, _delay);
-                        if (!mcw.UserActivityDetected) mcw.MoveSouth(distance, _delay);
+                        if (!mcw.Interrupted) mcw.MoveSouth(distance, _delay);
                         break;
                     case CursorDirection.DownAndUp:
                         mcw.MoveSouth(distance, _delay);
-                        if (!mcw.UserActivityDetected) mcw.MoveNorth(distance, _delay);
+                        if (!mcw.Interrupted) mcw.MoveNorth(distance, _delay);
                         break;
                     case CursorDirection.LeftAndRight:
                         mcw.MoveWest(distance, _delay);
-                        if (!mcw.UserActivityDetected) mcw.MoveEast(distance, _delay);
+                        if (!mcw.Interrupted) mcw.MoveEast(distance, _delay);
                         break;
                     case CursorDirection.RightAndLeft:
                         mcw.MoveEast(distance, _delay);
-                        if (!mcw.UserActivityDetected) mcw.MoveWest(distance, _delay);
+                        if (!mcw.Interrupted) mcw.MoveWest(distance, _delay);
                         break;
                     case CursorDirection.Random:
                         int remaining = distance;
@@ -161,7 +165,7 @@ namespace ellabi.Actions
                             int dir;
                             do { dir = new System.Random().Next(1, 9); } while (dir == lastDir);
                             lastDir = dir;
-                            if (mcw.UserActivityDetected) break;
+                            if (mcw.Interrupted) break;
                             switch (dir)
                             {
                                 case 1: mcw.MoveNorth(chunk, _delay); break;

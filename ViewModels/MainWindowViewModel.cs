@@ -37,13 +37,26 @@ namespace ellabi.ViewModels
         private Settings _settings = new();
 
         // ── Timers ─────────────────────────────────────────────────────────
-        private Timer? _intervalTimer;
-        private Timer? _countdownTimer;
+        // The countdown ticks on the UI thread and fires each interval when it reaches
+        // zero, so run-state changes all happen on one thread.
+        private DispatcherTimer? _countdownTimer;
         private int _countdownSeconds;
         private Timer? _autoPauseCheckTimer;
         private Timer? _environmentTimer;
-        private bool _pausedForBattery;
         private IScheduler? _quartzScheduler;
+
+        // ── Action runs ────────────────────────────────────────────────────
+        // Non-null while a run is in progress; cancelled by Pause/Stop so an in-flight
+        // run (e.g. a long cursor move) halts promptly.
+        private CancellationTokenSource? _actionsCts;
+
+        // ── Pause bookkeeping ──────────────────────────────────────────────
+        private enum PauseReason { None, User, Activity, Battery }
+        private PauseReason _pauseReason;
+
+        // Input before this moment (e.g. the click that started us) never auto-pauses.
+        private DateTime _ignoreActivityBeforeUtc;
+        private static readonly TimeSpan ActivityGrace = TimeSpan.FromSeconds(2);
 
         // ── Commands ───────────────────────────────────────────────────────
         public Utilities.RelayCommand StartCommand { get; }
@@ -217,7 +230,7 @@ namespace ellabi.ViewModels
             RebuildScheduleAndBlackoutCollections();
 
             StaticCode.ScheduleArrived         += OnScheduleArrived;
-            StaticCode.UpdateAvailablityChanged += v => UpdateAvailable = v;
+            StaticCode.UpdateAvailablityChanged += v => Dispatcher.UIThread.Post(() => UpdateAvailable = v);
             StaticCode.RefreshSchedules         += RefreshQuartzSchedules;
 
             InitialiseQuartzAsync().ConfigureAwait(false);
@@ -336,11 +349,15 @@ namespace ellabi.ViewModels
             try
             {
                 if (State == AppState.Running) return;
+                if (State == AppState.Paused) { Resume(); return; }
+
                 State = AppState.Running;
+                _pauseReason = PauseReason.None;
+                _ignoreActivityBeforeUtc = DateTime.UtcNow + ActivityGrace;
                 SetStatus(VisualStatus.Running);
                 StaticCode.Logger?.Here().Information("Start");
 
-                ExecuteActionsForTrigger(ActionBase.EventTrigger.Start);
+                _ = RunActionsAsync(ActionBase.EventTrigger.Start);
                 ScheduleNextInterval();
                 StartAutoPauseCheck();
                 StartEnvironmentCheck();
@@ -360,14 +377,19 @@ namespace ellabi.ViewModels
                 SetStatus(VisualStatus.Idle);
                 StaticCode.Logger?.Here().Information("Stop");
 
-                _intervalTimer?.Stop();
                 _countdownTimer?.Stop();
+                _actionsCts?.Cancel();
                 _autoPauseCheckTimer?.Stop();
                 _environmentTimer?.Stop();
-                _pausedForBattery = false;
+                _pauseReason = PauseReason.None;
                 CountdownSeconds = 0;
 
-                ExecuteActionsForTrigger(ActionBase.EventTrigger.Stop);
+                // Stop actions are not cancellable — they run to completion even though
+                // the interval run they may have interrupted was just cancelled.
+                var stopActions = GetActions(ActionBase.EventTrigger.Stop);
+                if (stopActions.Length > 0)
+                    _ = Task.Run(() => ExecuteActions(stopActions, CancellationToken.None));
+
                 ResetIntervalCounters();
             }
             catch (Exception ex)
@@ -376,16 +398,19 @@ namespace ellabi.ViewModels
             }
         }
 
-        public void Pause()
+        public void Pause() => Pause(PauseReason.User);
+
+        private void Pause(PauseReason reason)
         {
             try
             {
                 if (State != AppState.Running) return;
+                _pauseReason = reason;
                 State = AppState.Paused;
-                SetStatus(_pausedForBattery ? VisualStatus.Battery : VisualStatus.Paused);
-                StaticCode.Logger?.Here().Information("Pause");
-                _intervalTimer?.Stop();
+                SetStatus(reason == PauseReason.Battery ? VisualStatus.Battery : VisualStatus.Paused);
+                StaticCode.Logger?.Here().Information("Pause ({Reason})", reason);
                 _countdownTimer?.Stop();
+                _actionsCts?.Cancel();
             }
             catch (Exception ex)
             {
@@ -398,6 +423,8 @@ namespace ellabi.ViewModels
             try
             {
                 if (State != AppState.Paused) return;
+                _pauseReason = PauseReason.None;
+                _ignoreActivityBeforeUtc = DateTime.UtcNow + ActivityGrace;
                 State = AppState.Running;
                 SetStatus(VisualStatus.Running);
                 StaticCode.Logger?.Here().Information("Resume");
@@ -412,10 +439,6 @@ namespace ellabi.ViewModels
         // ── Interval execution ─────────────────────────────────────────────
         private void ScheduleNextInterval()
         {
-            _intervalTimer?.Stop();
-            _countdownTimer?.Stop();
-            _intervalTimer = new Timer();
-
             var lower = Math.Max(1, Settings.LowerInterval);
             var upper = Math.Max(lower, Settings.UpperInterval);
             var intervalSeconds = Settings.RandomInterval
@@ -424,45 +447,47 @@ namespace ellabi.ViewModels
 
             CountdownSeconds = intervalSeconds;
 
-            _countdownTimer = new Timer(1000) { AutoReset = true };
-            _countdownTimer.Elapsed += (_, _) =>
+            if (_countdownTimer == null)
             {
-                if (CountdownSeconds > 0)
-                    CountdownSeconds--;
-            };
-            _countdownTimer.Start();
+                _countdownTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+                _countdownTimer.Tick += OnCountdownTick;
+            }
 
-            _intervalTimer.Interval = intervalSeconds * 1000.0;
-            _intervalTimer.AutoReset = false;
-            _intervalTimer.Elapsed += OnIntervalElapsed;
-            _intervalTimer.Start();
+            // Restart so the first tick is a full second away.
+            _countdownTimer.Stop();
+            _countdownTimer.Start();
         }
 
-        private void OnIntervalElapsed(object? sender, ElapsedEventArgs e)
+        private void OnCountdownTick(object? sender, EventArgs e)
+        {
+            // Hold the countdown while a previous run is still finishing.
+            if (State != AppState.Running || _actionsCts != null) return;
+
+            if (CountdownSeconds > 1)
+            {
+                CountdownSeconds--;
+                return;
+            }
+
+            CountdownSeconds = 0;
+            _ = OnIntervalElapsedAsync();
+        }
+
+        private async Task OnIntervalElapsedAsync()
         {
             try
             {
-                if (State != AppState.Running) return;
+                _countdownTimer?.Stop();
 
                 // Check blackout periods — show the "sleeping" colour while dormant.
-                if (IsInBlackout()) { SetStatus(VisualStatus.Sleeping); ScheduleNextInterval(); return; }
+                if (IsInBlackout())
+                    SetStatus(VisualStatus.Sleeping);
+                else
+                    await RunActionsAsync(ActionBase.EventTrigger.Interval);
 
-                SetStatus(VisualStatus.Executing);
-                ExecuteActionsForTrigger(ActionBase.EventTrigger.Interval);
-
-                // Default mouse wiggle if no interval actions are configured
-                if (Settings.Actions == null ||
-                    !Settings.Actions.Any(a => a.IsEnabled && a.Trigger == ActionBase.EventTrigger.Interval))
-                {
-                    StaticCode.InputProvider?.MoveRelative(5, 0);
-                    StaticCode.InputProvider?.MoveRelative(-5, 0);
-                }
-
-                // Brief red flash, then back to the waiting (green) colour.
-                Thread.Sleep(200);
-                if (State == AppState.Running) SetStatus(VisualStatus.Running);
-
-                ScheduleNextInterval();
+                // A Pause or Stop during the run owns the countdown from here on.
+                if (State == AppState.Running)
+                    ScheduleNextInterval();
             }
             catch (Exception ex)
             {
@@ -470,38 +495,78 @@ namespace ellabi.ViewModels
             }
         }
 
-        private void ExecuteActionsForTrigger(ActionBase.EventTrigger trigger)
+        /// <summary>
+        /// Run the enabled actions for a trigger one after another on a background thread,
+        /// so e.g. a click never lands while a cursor move is still in progress. Pause and
+        /// Stop cancel the run. Called and resumed on the UI thread.
+        /// </summary>
+        private async Task RunActionsAsync(ActionBase.EventTrigger trigger)
         {
+            var actions = GetActions(trigger);
+
+            // Default mouse wiggle if no interval actions are configured
+            var wiggle = trigger == ActionBase.EventTrigger.Interval &&
+                         (Settings.Actions == null ||
+                          !Settings.Actions.Any(a => a.IsEnabled && a.Trigger == ActionBase.EventTrigger.Interval));
+
+            if (actions.Length == 0 && !wiggle) return;
+
+            var cts = new CancellationTokenSource();
+            _actionsCts = cts;
+            SetStatus(VisualStatus.Executing);
+
             try
             {
-                if (Settings.Actions == null) return;
-
-                foreach (var action in Settings.Actions.Where(a => a.IsEnabled && a.Trigger == trigger))
+                // Keep the red flash visible for at least a moment, even for quick runs.
+                var minimumFlash = Task.Delay(200);
+                await Task.Run(() =>
                 {
-                    try
+                    ExecuteActions(actions, cts.Token);
+                    if (wiggle && !cts.IsCancellationRequested)
                     {
-                        if (action.RepeatMode == ActionBase.IntervalRepeatMode.Throttle &&
-                            action.IntervalExecutionCount >= action.IntervalThrottle)
-                            continue;
-
-                        if (action.CanExecute())
-                        {
-                            Task.Run(() =>
-                            {
-                                try { action.Execute(); }
-                                catch (Exception ex) { StaticCode.Logger?.Here().Error(ex.Message); }
-                            });
-                        }
+                        StaticCode.InputProvider?.MoveRelative(5, 0);
+                        StaticCode.InputProvider?.MoveRelative(-5, 0);
                     }
-                    catch (Exception ex)
+                });
+                await minimumFlash;
+            }
+            finally
+            {
+                // A newer run may have replaced us (Stop then Start mid-run).
+                if (_actionsCts == cts) _actionsCts = null;
+                cts.Dispose();
+            }
+
+            // Back to the waiting (green) colour.
+            if (State == AppState.Running) SetStatus(VisualStatus.Running);
+        }
+
+        private ActionBase[] GetActions(ActionBase.EventTrigger trigger) =>
+            Settings.Actions?
+                .Where(a => a.IsEnabled && a.Trigger == trigger)
+                .Where(a => !(a.RepeatMode == ActionBase.IntervalRepeatMode.Throttle &&
+                              a.IntervalExecutionCount >= a.IntervalThrottle))
+                .ToArray()
+            ?? Array.Empty<ActionBase>();
+
+        private static void ExecuteActions(ActionBase[] actions, CancellationToken token)
+        {
+            foreach (var action in actions)
+            {
+                if (token.IsCancellationRequested) break;
+
+                try
+                {
+                    if (action.CanExecute())
                     {
-                        StaticCode.Logger?.Here().Error(ex.Message);
+                        action.CancellationToken = token;
+                        action.Execute();
                     }
                 }
-            }
-            catch (Exception ex)
-            {
-                StaticCode.Logger?.Here().Error(ex.Message);
+                catch (Exception ex)
+                {
+                    StaticCode.Logger?.Here().Error(ex.Message);
+                }
             }
         }
 
@@ -534,17 +599,27 @@ namespace ellabi.ViewModels
 
                 var idle = StaticCode.GetLastInputTime();
 
+                // Input from just before/around Start or Resume (e.g. the click that
+                // started us) is not "the user came back" and must not auto-pause.
+                var lastInputUtc = DateTime.UtcNow - idle;
+
                 // This runs on a System.Timers.Timer (background) thread. Pause()/Resume()
                 // mutate UI-bound state, which Avalonia only permits on the UI thread, so
                 // marshal the calls there to avoid a "Call from invalid thread" exception.
-                if (Settings.AutoPause && State == AppState.Running && idle.TotalSeconds < 2)
+                if (Settings.AutoPause && State == AppState.Running && idle.TotalSeconds < 2 &&
+                    lastInputUtc > _ignoreActivityBeforeUtc)
                 {
-                    Dispatcher.UIThread.Post(Pause);
+                    Dispatcher.UIThread.Post(() => Pause(PauseReason.Activity));
                 }
                 else if (Settings.AutoResume && State == AppState.Paused &&
+                         _pauseReason == PauseReason.Activity &&
                          idle.TotalSeconds >= Settings.AutoResumeSeconds)
                 {
-                    Dispatcher.UIThread.Post(Resume);
+                    // Only undo our own activity pause — never a manual or battery pause.
+                    Dispatcher.UIThread.Post(() =>
+                    {
+                        if (_pauseReason == PauseReason.Activity) Resume();
+                    });
                 }
             }
             catch (Exception ex)
@@ -569,19 +644,20 @@ namespace ellabi.ViewModels
             try
             {
                 // Pause while on battery; resume once mains power returns (only if we
-                // were the ones who paused for battery — don't fight a user-activity pause).
+                // were the ones who paused for battery — don't fight any other pause).
                 if (Settings.PauseOnBattery)
                 {
                     var onBattery = SystemStateMonitor.IsOnBattery();
                     if (onBattery && State == AppState.Running)
                     {
-                        _pausedForBattery = true;
-                        Dispatcher.UIThread.Post(Pause);
+                        Dispatcher.UIThread.Post(() => Pause(PauseReason.Battery));
                     }
-                    else if (!onBattery && _pausedForBattery && State == AppState.Paused)
+                    else if (!onBattery && State == AppState.Paused && _pauseReason == PauseReason.Battery)
                     {
-                        _pausedForBattery = false;
-                        Dispatcher.UIThread.Post(Resume);
+                        Dispatcher.UIThread.Post(() =>
+                        {
+                            if (_pauseReason == PauseReason.Battery) Resume();
+                        });
                     }
                 }
 
@@ -671,8 +747,13 @@ namespace ellabi.ViewModels
 
         private void OnScheduleArrived(ScheduleBase.ScheduleAction action)
         {
-            if (action == ScheduleBase.ScheduleAction.Start) Start();
-            else Stop();
+            // Quartz calls this on a worker thread; Start()/Stop() touch UI-bound state
+            // (command CanExecute), which throws off the UI thread.
+            Dispatcher.UIThread.Post(() =>
+            {
+                if (action == ScheduleBase.ScheduleAction.Start) Start();
+                else Stop();
+            });
         }
 
         // ── Settings persistence ───────────────────────────────────────────

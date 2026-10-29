@@ -15,11 +15,17 @@ namespace ellabi.Wrappers
 
         public bool BreakOnUserActivity { get; set; }
         public bool UserActivityDetected { get; private set; }
+        public CancellationToken CancellationToken { get; set; }
+
+        /// <summary>True once the movement should stop: user activity, or the run was cancelled.</summary>
+        public bool Interrupted => UserActivityDetected || CancellationToken.IsCancellationRequested;
 
         public void MoveFromCurrentLocation(Point delta)
         {
             try
             {
+                if (CancellationToken.IsCancellationRequested) return;
+
                 // Break-on-user-activity: stop as soon as the user is at the controls.
                 // On X11 we detect this by the pointer being somewhere we didn't put it;
                 // on Wayland (no pointer read) we use recent real input from evdev.
@@ -52,7 +58,7 @@ namespace ellabi.Wrappers
             for (int i = 0; i < distance; i++)
             {
                 MoveFromCurrentLocation(new Point(dx, dy));
-                if (UserActivityDetected) break;
+                if (Interrupted) break;
                 Thread.Sleep(delay);
             }
         }
